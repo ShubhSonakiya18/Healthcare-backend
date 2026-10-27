@@ -1,0 +1,18 @@
+# Install with: pip install -r requirements.txt
+
+# Direct dependencies
+Django==5.2.18
+djangorestframework==3.18.3
+djangorestframework-simplejwt==5.5.1
+psycopg[binary]==3.3.6
+python-dotenv==1.2.4
+
+# Installed by the packages above; pinned so every install gets the same versions
+asgiref==3.13.0
+PyJWT==2.15.1
+psycopg-binary==3.3.6
+sqlparse==0.6.0
+
+# Needed only on Windows, or on Python versions older than 3.13
+tzdata==2026.5; sys_platform == "win32"
+typing_extensions==4.16.0; python_version < "3.13"
