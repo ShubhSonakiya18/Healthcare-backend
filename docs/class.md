@@ -2,7 +2,7 @@
 
 **Status legend:** 🟡 Proposed (not written yet) · 🟢 Implemented (exists in code and is tested) · 🔴 Removed
 
-The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7.
+The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3.
 
 **Related:** [design.md](design.md) (fields and contracts) · [architecture.md](architecture.md) (how requests flow)
 
@@ -84,36 +84,38 @@ flowchart LR
 
 ## 3. accounts
 
-### `User` 🟡
+> **Phase 3:** implemented and verified on 28 Oct 2026. `python manage.py test accounts` on PostgreSQL 18.6: 49 tests run, 49 passed.
+
+### `User` 🟢
 
 | | |
 |---|---|
 | **File** | `accounts/models.py` |
 | **Inherits** | `django.contrib.auth.models.AbstractUser` |
 | **Responsibility** | The person using the API. Logs in with an email address. |
-| **Key attributes** | `email` (unique), `name`, `password` (hash), `is_active`, `is_staff`, `is_superuser`, `date_joined`; `username = None`, `first_name = None`, `last_name = None`; `USERNAME_FIELD = "email"`; `REQUIRED_FIELDS = ["name"]`; `objects = UserManager()` |
-| **Key methods** | Inherited `set_password()` and `check_password()`; `__str__()` returns the email |
+| **Key attributes** | `email` (unique), `name`, `password` (hash), `is_active`, `is_staff`, `is_superuser`, `date_joined`; `username = None`, `first_name = None`, `last_name = None`; `USERNAME_FIELD = "email"`; `REQUIRED_FIELDS = ["name"]`; `objects = UserManager()`; `Meta(AbstractUser.Meta)` with `ordering = ["id"]` |
+| **Key methods** | Inherited `set_password()` and `check_password()`; `__str__()` returns the email; `get_full_name()` and `get_short_name()` return `name` |
 | **Depends on** | `UserManager` |
 | **Used by** | `RegisterSerializer`; SimpleJWT (login, and turning a token back into a user); `Patient.created_by`; `Doctor.created_by`; `createsuperuser` |
 | **Concepts** | Custom user model, `AUTH_USER_MODEL`, abstract base classes, model fields |
 
 **In plain words:** Django's normal user logs in with a username. Ours logs in with an email and has one `name` field. It has to exist before the first migration, because other tables point at it.
 
-### `UserManager` 🟡
+### `UserManager` 🟢
 
 | | |
 |---|---|
 | **File** | `accounts/managers.py` |
 | **Inherits** | `django.contrib.auth.base_user.BaseUserManager` |
 | **Responsibility** | The only way users are created. Normalises the email and hashes the password. |
-| **Key methods** | `create_user(email, password, **extra_fields)`; `create_superuser(email, password, **extra_fields)`, which forces `is_staff` and `is_superuser` to True and rejects anything else |
+| **Key methods** | `normalize_email()`: trims and lower-cases the whole address (Django's own only lower-cases the domain); `get_by_natural_key()`: normalises before looking up, so Django's login check, admin login and `createsuperuser` match the stored email; `create_user(email, password, **extra_fields)`: requires an email and a non-blank `name`; `create_superuser(email, password, **extra_fields)`, which forces `is_staff` and `is_superuser` to True and rejects anything else |
 | **Used by** | `RegisterSerializer.create()`, `python manage.py createsuperuser`, tests |
 | **Uses** | `User` (via `self.model`), `set_password()` |
 | **Concepts** | Model managers, `use_in_migrations` |
 
 **In plain words:** the default manager expects a username; ours expects an email. Because `create_user()` calls `set_password()`, the plain password never reaches the database.
 
-### `RegisterSerializer` 🟡
+### `RegisterSerializer` 🟢
 
 | | |
 |---|---|
@@ -121,14 +123,14 @@ flowchart LR
 | **Inherits** | `rest_framework.serializers.ModelSerializer` |
 | **Responsibility** | Validates registration input and creates the user |
 | **Fields** | `id` (read-only), `name`, `email` (with `UniqueValidator(lookup="iexact")`), `password` (write-only) |
-| **Key methods** | `validate_email()` trims and lower-cases; `validate()` runs `validate_password()` against a temporary `User(email=..., name=...)`; `create()` calls `User.objects.create_user(...)` inside `transaction.atomic()` and turns an `IntegrityError` into a 400 on `email` |
+| **Key methods** | `validate_email()` trims and lower-cases (via `User.objects.normalize_email()`); `validate()` runs `validate_password()` against a temporary `User(email=..., name=...)`; `create()` calls `User.objects.create_user(...)` inside `transaction.atomic()` and turns an `IntegrityError` into a 400 on `email` |
 | **Used by** | `RegisterView` |
 | **Uses** | `User`, `UserManager`, Django's password validators |
 | **Concepts** | `ModelSerializer`, field-level vs object-level validation, `write_only` |
 
 **In plain words:** it checks the data is good, then asks the manager to create the user. The password goes in and never comes back out.
 
-### `EmailTokenObtainPairSerializer` 🟡
+### `EmailTokenObtainPairSerializer` 🟢
 
 | | |
 |---|---|
@@ -136,27 +138,27 @@ flowchart LR
 | **Inherits** | `rest_framework_simplejwt.serializers.TokenObtainPairSerializer` |
 | **Responsibility** | Lower-cases the email before SimpleJWT checks the credentials |
 | **Fields (inherited)** | `email`, `password` (write-only); the field name comes from `USERNAME_FIELD` |
-| **Key methods** | `validate(attrs)`: lower-cases `attrs["email"]`, then calls `super().validate(attrs)`, which returns `{"refresh": ..., "access": ...}` |
+| **Key methods** | `validate(attrs)`: normalises `attrs["email"]` with `User.objects.normalize_email()`, then calls `super().validate(attrs)`, which returns `{"refresh": ..., "access": ...}` |
 | **Used by** | `LoginView` |
 | **Uses** | Django's `authenticate()`, which uses `ModelBackend` and `User` |
 | **Concepts** | Extending a library class instead of rewriting it |
 
 **In plain words:** SimpleJWT's standard login, plus one line so that `Asha@Example.com` can log in to the account stored as `asha@example.com`.
 
-### `RegisterView` 🟡
+### `RegisterView` 🟢
 
 | | |
 |---|---|
 | **File** | `accounts/views.py` |
 | **Inherits** | `rest_framework.generics.CreateAPIView` |
-| **Key attributes** | `serializer_class = RegisterSerializer`; `permission_classes = [AllowAny]` |
+| **Key attributes** | `serializer_class = RegisterSerializer`; `permission_classes = [AllowAny]`; `authentication_classes = []`, so a stale `Authorization` header can't turn a registration into a 401 (as in SimpleJWT's own token views) |
 | **Key methods** | Inherited `post()`, which calls `create()` and returns 201 |
 | **URL** | `api/auth/register/` (name `auth-register`) |
 | **Concepts** | Generic views; overriding the global permission default |
 
 **In plain words:** together with login, the only open door. It deliberately overrides the global "must be logged in" rule.
 
-### `LoginView` 🟡
+### `LoginView` 🟢
 
 | | |
 |---|---|
@@ -380,11 +382,13 @@ Implemented, and verified by running each failure case by hand in Phase 2.
 | `TokenObtainPairSerializer`, `TokenObtainPairView`, `TokenRefreshView` | SimpleJWT | Login and token refresh |
 | `APITestCase`, `APIClient` | DRF | Tests |
 
-## 9. Test classes (planned)
+## 9. Test classes
+
+The `accounts` row is implemented (🟢, Phase 3); the other rows are planned (🟡).
 
 | Class | File | Covers |
 |---|---|---|
-| `RegisterTests`, `LoginTests`, `TokenRefreshTests` | `accounts/tests.py` | Registration, login, refresh, password storage |
+| 🟢 No database: `UserModelDefinitionTests`, `UserManagerUnitTests`, `PasswordPolicyTests`, `RegisterEndpointWithoutDatabaseTests`, `TokenWithoutDatabaseTests`. PostgreSQL: `UserManagerTests`, `RegisterTests`, `LoginTests`, `RealJwtFlowTests`, `TokenRefreshTests` | `accounts/tests.py` | User model and manager, password policy, registration, login, refresh, real-JWT flow, `createsuperuser` |
 | `PatientApiTests`, `PatientIsolationTests` | `patients/tests.py` | CRUD and validation; two-user isolation; `IsPatientOwner` unit test |
 | `DoctorApiTests`, `DoctorPermissionTests` | `doctors/tests.py` | CRUD and validation; creator-only writes; 409 on delete |
 | `MappingApiTests`, `MappingIsolationTests` | `mappings/tests.py` | Assign, list, by patient, delete; duplicates; two-user isolation |

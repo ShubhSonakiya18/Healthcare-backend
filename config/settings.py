@@ -65,7 +65,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "accounts",
 ]
+
+# Our own user model. It must be set before the first `migrate`,
+# because every foreign key to "the user" points at whatever this was then.
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -112,7 +117,9 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
+        # Our User has no username, first_name or last_name.
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "OPTIONS": {"user_attributes": ("email", "name")},
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
