@@ -2,7 +2,7 @@
 
 **Status legend:** 🟡 Proposed (not written yet) · 🟢 Implemented (exists in code and is tested) · 🔴 Removed
 
-The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3.
+The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5, except `DoctorInUse` (Phase 5).
 
 **Related:** [design.md](design.md) (fields and contracts) · [architecture.md](architecture.md) (how requests flow)
 
@@ -178,7 +178,9 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ## 4. patients
 
-### `Patient` 🟡
+> **Phase 4:** implemented and verified on 28 Oct 2026. `python manage.py test patients` on PostgreSQL 18.6 (26 tests) passed as part of a 94-test run.
+
+### `Patient` 🟢
 
 | | |
 |---|---|
@@ -191,7 +193,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Used by** | `PatientSerializer`, the patient views, `PatientDoctorMapping.patient` |
 | **Concepts** | `ForeignKey`, `on_delete`, `choices`, validators, `auto_now` / `auto_now_add` |
 
-### `PatientSerializer` 🟡
+### `PatientSerializer` 🟢
 
 | | |
 |---|---|
@@ -203,7 +205,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 **In plain words:** it converts patients to JSON and checks incoming data. It knows nothing about ownership; the view takes care of that.
 
-### `IsPatientOwner` 🟡
+### `IsPatientOwner` 🟢
 
 | | |
 |---|---|
@@ -215,7 +217,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 **In plain words:** a second lock on the door. The queryset already hides other users' patients; this check still protects them if someone later widens the queryset.
 
-### `PatientListCreateView` 🟡
+### `PatientListCreateView` 🟢
 
 | | |
 |---|---|
@@ -226,7 +228,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 **In plain words:** GET lists your patients; POST creates one and stamps you as its owner.
 
-### `PatientDetailView` 🟡
+### `PatientDetailView` 🟢
 
 | | |
 |---|---|
@@ -242,7 +244,9 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ## 5. doctors
 
-### `Doctor` 🟡
+> **Phase 4:** implemented and verified on 28 Oct 2026, except `DoctorInUse` (Phase 5). `python manage.py test doctors` on PostgreSQL 18.6 (19 tests) passed as part of a 94-test run.
+
+### `Doctor` 🟢
 
 | | |
 |---|---|
@@ -251,16 +255,16 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `__str__()` returns the name |
 | **Used by** | `DoctorSerializer`, the doctor views, `PatientDoctorMapping.doctor` |
 
-### `DoctorSerializer` 🟡
+### `DoctorSerializer` 🟢
 
 | | |
 |---|---|
 | **File** | `doctors/serializers.py` |
 | **Fields** | `id`, `name`, `specialization`, `email`, `created_at`, `updated_at`; `created_by` is not a field |
-| **Key methods** | `validate_email()` trims and lower-cases; the email field uses `UniqueValidator(lookup="iexact")` |
+| **Key methods** | `validate_email()` trims and lower-cases (via `User.objects.normalize_email()`); the email field uses `UniqueValidator(lookup="iexact")`; `save()` runs inside `transaction.atomic()` and turns an `IntegrityError` from a simultaneous duplicate into the same 400 on `email` |
 | **Used by** | The doctor views; nested inside `PatientDoctorMappingSerializer` as `doctor_detail` |
 
-### `IsCreatorOrReadOnly` 🟡
+### `IsCreatorOrReadOnly` 🟢
 
 | | |
 |---|---|
@@ -268,7 +272,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `has_object_permission()` returns True for safe methods (GET, HEAD, OPTIONS); otherwise `obj.created_by_id == request.user.id`. A NULL creator never matches, so the result is 403. |
 | **Used by** | `DoctorDetailView` |
 
-### `DoctorListCreateView` 🟡
+### `DoctorListCreateView` 🟢
 
 | | |
 |---|---|
@@ -277,14 +281,14 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key attributes and methods** | `queryset = Doctor.objects.all()`; `perform_create()` sets `created_by` |
 | **URL** | `api/doctors/` (name `doctor-list`) |
 
-### `DoctorDetailView` 🟡
+### `DoctorDetailView` 🟢
 
 | | |
 |---|---|
 | **File** | `doctors/views.py` |
 | **Inherits** | `RetrieveUpdateDestroyAPIView` |
 | **Key attributes** | `permission_classes = [IsAuthenticated, IsCreatorOrReadOnly]`; `http_method_names` restricted like the patient detail view |
-| **Key methods** | `perform_destroy(instance)`: deletes, but catches `ProtectedError` and raises `DoctorInUse` (added in Phase 5) |
+| **Key methods** | Phase 4 uses the inherited methods. Phase 5 adds `perform_destroy(instance)`: deletes, but catches `ProtectedError` and raises `DoctorInUse` |
 | **URL** | `api/doctors/<int:pk>/` (name `doctor-detail`) |
 
 ### `DoctorInUse` 🟡
@@ -384,13 +388,13 @@ Implemented, and verified by running each failure case by hand in Phase 2.
 
 ## 9. Test classes
 
-The `accounts` row is implemented (🟢, Phase 3); the other rows are planned (🟡).
+The `accounts` (Phase 3), `patients` and `doctors` (Phase 4) rows are implemented (🟢); the `mappings` row is planned (🟡).
 
 | Class | File | Covers |
 |---|---|---|
 | 🟢 No database: `UserModelDefinitionTests`, `UserManagerUnitTests`, `PasswordPolicyTests`, `RegisterEndpointWithoutDatabaseTests`, `TokenWithoutDatabaseTests`. PostgreSQL: `UserManagerTests`, `RegisterTests`, `LoginTests`, `RealJwtFlowTests`, `TokenRefreshTests` | `accounts/tests.py` | User model and manager, password policy, registration, login, refresh, real-JWT flow, `createsuperuser` |
-| `PatientApiTests`, `PatientIsolationTests` | `patients/tests.py` | CRUD and validation; two-user isolation; `IsPatientOwner` unit test |
-| `DoctorApiTests`, `DoctorPermissionTests` | `doctors/tests.py` | CRUD and validation; creator-only writes; 409 on delete |
+| 🟢 `PatientRequiresTokenTests`, `PatientRealJwtTests`, `PatientCreateTests`, `PatientReadUpdateDeleteTests`, `PatientIsolationTests`, `IsPatientOwnerTests` | `patients/tests.py` | CRUD and validation; no token → 401; real JWT; two-user isolation; `IsPatientOwner` unit test |
+| 🟢 `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race. The 409 on delete comes in Phase 5 |
 | `MappingApiTests`, `MappingIsolationTests` | `mappings/tests.py` | Assign, list, by patient, delete; duplicates; two-user isolation |
 
 Each app also has at least one test that logs in through `/api/auth/login/` and uses the real token.

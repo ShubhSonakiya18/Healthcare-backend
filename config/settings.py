@@ -66,6 +66,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "accounts",
+    "patients",
+    "doctors",
 ]
 
 # Our own user model. It must be set before the first `migrate`,
