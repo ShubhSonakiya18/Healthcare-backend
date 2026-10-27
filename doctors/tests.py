@@ -4,6 +4,7 @@ Most tests use force_authenticate() to focus on the view's logic;
 DoctorRealJwtTests sends a real token from the login endpoint.
 """
 
+from datetime import date
 from types import SimpleNamespace
 from unittest import mock
 
@@ -13,6 +14,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.validators import UniqueValidator
+
+from mappings.models import PatientDoctorMapping
+from patients.models import Patient
 
 from .models import Doctor
 from .permissions import IsCreatorOrReadOnly
@@ -209,6 +213,42 @@ class DoctorPermissionTests(DoctorTestCase):
         )
         self.assertEqual(self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN)
         self.assert_name(self.others_doctor, "Dr. Sara Khan")
+
+
+class DoctorInUseTests(DoctorTestCase):
+    """Deleting a doctor who is still assigned → 409, and nothing is deleted."""
+
+    def setUp(self):
+        super().setUp()
+        # Another user's patient is assigned to the creator's doctor.
+        self.patient = Patient.objects.create(
+            created_by=self.other, name="Meera Iyer", date_of_birth=date(1985, 1, 1)
+        )
+        self.mapping = PatientDoctorMapping.objects.create(patient=self.patient, doctor=self.doctor)
+
+    def test_deleting_an_assigned_doctor_is_409_and_nothing_is_deleted(self):
+        response = self.client.delete(detail_url(self.doctor.id))
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            response.data,
+            {
+                "detail": "This doctor is assigned to one or more patients. "
+                "Remove those assignments before deleting the doctor."
+            },
+        )
+        self.assertTrue(Doctor.objects.filter(id=self.doctor.id).exists())
+        self.assertTrue(PatientDoctorMapping.objects.filter(id=self.mapping.id).exists())
+
+    def test_after_its_assignments_are_removed_the_doctor_can_be_deleted(self):
+        # The patient's owner removes the assignment...
+        self.client.force_authenticate(self.other)
+        removed = self.client.delete(reverse("mapping-detail", args=[self.mapping.id]))
+        self.assertEqual(removed.status_code, status.HTTP_204_NO_CONTENT)
+        # ...and then the doctor's creator can delete the doctor.
+        self.client.force_authenticate(self.creator)
+        response = self.client.delete(detail_url(self.doctor.id))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Doctor.objects.filter(id=self.doctor.id).exists())
 
 
 class IsCreatorOrReadOnlyTests(SimpleTestCase):

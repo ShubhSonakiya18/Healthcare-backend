@@ -2,7 +2,7 @@
 
 **Status legend:** 🟡 Proposed (not written yet) · 🟢 Implemented (exists in code and is tested) · 🔴 Removed
 
-The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5, except `DoctorInUse` (Phase 5).
+The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5; Phase 5 added §6 and `DoctorInUse`.
 
 **Related:** [design.md](design.md) (fields and contracts) · [architecture.md](architecture.md) (how requests flow)
 
@@ -244,7 +244,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ## 5. doctors
 
-> **Phase 4:** implemented and verified on 28 Oct 2026, except `DoctorInUse` (Phase 5). `python manage.py test doctors` on PostgreSQL 18.6 (19 tests) passed as part of a 94-test run.
+> **Phases 4–5:** implemented and verified on 28 Oct 2026 (`DoctorInUse` in Phase 5). `python manage.py test doctors` on PostgreSQL 18.6 (21 tests) passed as part of a 118-test run.
 
 ### `Doctor` 🟢
 
@@ -288,10 +288,10 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **File** | `doctors/views.py` |
 | **Inherits** | `RetrieveUpdateDestroyAPIView` |
 | **Key attributes** | `permission_classes = [IsAuthenticated, IsCreatorOrReadOnly]`; `http_method_names` restricted like the patient detail view |
-| **Key methods** | Phase 4 uses the inherited methods. Phase 5 adds `perform_destroy(instance)`: deletes, but catches `ProtectedError` and raises `DoctorInUse` |
+| **Key methods** | `perform_destroy(instance)`: deletes, but catches `ProtectedError` (from the mapping's `PROTECT`) and raises `DoctorInUse` (409); nothing is deleted |
 | **URL** | `api/doctors/<int:pk>/` (name `doctor-detail`) |
 
-### `DoctorInUse` 🟡
+### `DoctorInUse` 🟢
 
 | | |
 |---|---|
@@ -305,7 +305,9 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ## 6. mappings
 
-### `PatientDoctorMapping` 🟡
+> **Phase 5:** implemented and verified on 28 Oct 2026. `python manage.py test mappings` on PostgreSQL 18.6 (22 tests) passed as part of a 118-test run.
+
+### `PatientDoctorMapping` 🟢
 
 | | |
 |---|---|
@@ -314,7 +316,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Meta** | `constraints = [UniqueConstraint(fields=["patient", "doctor"], name="unique_patient_doctor")]`; `ordering = ["id"]` |
 | **Key methods** | `__str__()` returns "patient → doctor" |
 
-### `PatientDoctorMappingSerializer` 🟡
+### `PatientDoctorMappingSerializer` 🟢
 
 | | |
 |---|---|
@@ -327,7 +329,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 **In plain words:** the `patient` field only "knows about" your patients, so another user's patient id looks exactly like an id that doesn't exist.
 
-### `MappingListCreateView` 🟡
+### `MappingListCreateView` 🟢
 
 | | |
 |---|---|
@@ -336,7 +338,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `get_queryset()` returns `PatientDoctorMapping.objects.filter(patient__created_by=user).select_related("patient", "doctor")`; `perform_create()` saves inside `transaction.atomic()` and turns an `IntegrityError` into the duplicate 400 |
 | **URL** | `api/mappings/` (name `mapping-list`) |
 
-### `MappingDetailView` 🟡
+### `MappingDetailView` 🟢
 
 | | |
 |---|---|
@@ -388,13 +390,13 @@ Implemented, and verified by running each failure case by hand in Phase 2.
 
 ## 9. Test classes
 
-The `accounts` (Phase 3), `patients` and `doctors` (Phase 4) rows are implemented (🟢); the `mappings` row is planned (🟡).
+All rows are implemented (🟢): `accounts` in Phase 3, `patients` and `doctors` in Phase 4, `mappings` and the doctor 409 tests in Phase 5.
 
 | Class | File | Covers |
 |---|---|---|
 | 🟢 No database: `UserModelDefinitionTests`, `UserManagerUnitTests`, `PasswordPolicyTests`, `RegisterEndpointWithoutDatabaseTests`, `TokenWithoutDatabaseTests`. PostgreSQL: `UserManagerTests`, `RegisterTests`, `LoginTests`, `RealJwtFlowTests`, `TokenRefreshTests` | `accounts/tests.py` | User model and manager, password policy, registration, login, refresh, real-JWT flow, `createsuperuser` |
 | 🟢 `PatientRequiresTokenTests`, `PatientRealJwtTests`, `PatientCreateTests`, `PatientReadUpdateDeleteTests`, `PatientIsolationTests`, `IsPatientOwnerTests` | `patients/tests.py` | CRUD and validation; no token → 401; real JWT; two-user isolation; `IsPatientOwner` unit test |
-| 🟢 `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race. The 409 on delete comes in Phase 5 |
-| `MappingApiTests`, `MappingIsolationTests` | `mappings/tests.py` | Assign, list, by patient, delete; duplicates; two-user isolation |
+| 🟢 `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `DoctorInUseTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race; 409 while assigned |
+| 🟢 `MappingRequiresTokenTests`, `MappingRealJwtTests`, `MappingCreateTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`, `MappingCascadeTests` | `mappings/tests.py` | Assign, list (one query), by patient, delete; duplicates and the duplicate race; two-user isolation; patient id vs mapping id; patient delete cascades |
 
 Each app also has at least one test that logs in through `/api/auth/login/` and uses the real token.

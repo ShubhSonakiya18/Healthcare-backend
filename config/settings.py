@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "accounts",
     "patients",
     "doctors",
+    "mappings",
 ]
 
 # Our own user model. It must be set before the first `migrate`,
