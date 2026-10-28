@@ -78,7 +78,7 @@ healthcare-backend/
 ├── mappings/                 # patient–doctor assignments
 ├── postman/
 │   └── healthcare-backend.postman_collection.json
-└── docs/                     # requirements, design, decisions, architecture, API reference
+└── docs/                     # requirements, design, architecture, API reference
 ```
 
 Each app has `models.py`, `serializers.py`, `views.py`, `urls.py`, `tests.py` and `migrations/`. `patients` and `doctors` also have `permissions.py`, and `accounts` has `managers.py`.
