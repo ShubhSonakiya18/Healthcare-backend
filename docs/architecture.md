@@ -1,6 +1,6 @@
 # Architecture — Healthcare Backend
 
-**Status:** Approved 27 Oct 2026. The system described in §1–§12 is implemented (Phases 2–7, 28 Oct 2026); §13 lists what a production deployment would add, which is not built. Updated whenever the code changes.
+**Status:** Approved 27 Oct 2026. The system described in sections 1–12 is implemented (28 Oct 2026); section 13 lists what a production deployment would add, which is not built. Updated whenever the code changes.
 **Related:** [design.md](design.md) (data and API contracts) · [class.md](class.md) (class reference) · [api.md](api.md) (reference for API clients)
 
 **Assignment requirement or our design?** The assignment mandates the stack: Django, DRF, PostgreSQL, the Django ORM, SimpleJWT and environment variables for sensitive configuration. Everything else in this document is our design.
@@ -131,8 +131,8 @@ healthcare-backend/
 ├── config/                 # the project package
 │   ├── settings.py
 │   ├── urls.py
-│   ├── views.py            # JSON error handlers (Phase 6)
-│   ├── tests.py            # project-wide tests (Phase 6)
+│   ├── views.py            # JSON error handlers
+│   ├── tests.py            # project-wide tests
 │   ├── asgi.py
 │   └── wsgi.py
 ├── accounts/               # users, register, login
@@ -149,42 +149,40 @@ healthcare-backend/
 ├── postman/
 │   └── healthcare-backend.postman_collection.json
 └── docs/
-    ├── architecture.md, design.md, class.md, api.md   # committed
-    ├── plan.md, memory.md        # committed during development
-    └── learning.md, rules.md     # local only, git-ignored
+    └── architecture.md, design.md, class.md, api.md
 ```
 
 Each app also has the `__init__.py`, `apps.py` and `admin.py` files that `startapp` creates.
 
 ## 5. Module responsibilities
 
-| Module | Responsibility | Phase |
-|---|---|---|
-| `manage.py` | Command-line entry point: `runserver`, `migrate`, `test`, `createsuperuser` | 2 ✅ |
-| `config/settings.py` | All configuration, read from environment variables through three small helpers (`env_required`, `env_bool`, `env_list`) | 2 ✅ |
-| `config/urls.py` | Mounts `api/auth/`, `api/patients/`, `api/doctors/`, `api/mappings/` (and `admin/`); sets `handler400`, `handler404`, `handler500` | 2–6 ✅ |
-| `config/views.py` | JSON error handlers `bad_request`, `not_found`, `server_error` (used when `DEBUG` is off) | 6 ✅ |
-| `config/tests.py` | Project-wide tests: error responses, token lifecycle, logging, response exposure, settings helpers | 6 ✅ |
-| `config/wsgi.py`, `config/asgi.py` | Server entry points (unchanged defaults) | 2 ✅ |
-| `accounts/models.py` | `User`: email login, a `name` field, no username | 3 ✅ |
-| `accounts/managers.py` | `UserManager`: creates users and superusers, normalises the email, hashes the password | 3 ✅ |
-| `accounts/serializers.py` | `RegisterSerializer`, `EmailTokenObtainPairSerializer` | 3 ✅ |
-| `accounts/views.py` | `RegisterView`, `LoginView` | 3 ✅ |
-| `patients/models.py` | `Patient`, with the `created_by` owner foreign key | 4 ✅ |
-| `patients/serializers.py` | `PatientSerializer`: field validation (date of birth, phone, gender) | 4 ✅ |
-| `patients/permissions.py` | `IsPatientOwner`: object-level backstop | 4 ✅ |
-| `patients/views.py` | List/create and detail views, with querysets scoped to the caller | 4 ✅ |
-| `doctors/models.py` | `Doctor`, with a nullable `created_by` | 4 ✅ |
-| `doctors/serializers.py` | `DoctorSerializer`: case-insensitive unique email | 4 ✅ |
-| `doctors/permissions.py` | `IsCreatorOrReadOnly` | 4 ✅ |
-| `doctors/views.py` | List/create and detail views; `DoctorInUse` (409) | 4–5 ✅ |
-| `mappings/models.py` | `PatientDoctorMapping`, unique per (patient, doctor) | 5 ✅ |
-| `mappings/serializers.py` | `PatientDoctorMappingSerializer`: `patient` field limited to the caller's patients | 5 ✅ |
-| `mappings/views.py` | `MappingListCreateView`, `MappingDetailView` | 5 ✅ |
-| `*/tests.py` | API tests for that app | 3–6 ✅ |
-| `*/migrations/` | Generated schema changes, committed to Git | 3–5 ✅ |
-| `postman/healthcare-backend.postman_collection.json` | Postman collection for manual and automated (newman) runs | 7 ✅ |
-| `README.md`, `docs/api.md` | Setup and usage; the API reference for clients | 8 ✅ |
+| Module | Responsibility |
+|---|---|
+| `manage.py` | Command-line entry point: `runserver`, `migrate`, `test`, `createsuperuser` |
+| `config/settings.py` | All configuration, read from environment variables through three small helpers (`env_required`, `env_bool`, `env_list`) |
+| `config/urls.py` | Mounts `api/auth/`, `api/patients/`, `api/doctors/`, `api/mappings/` (and `admin/`); sets `handler400`, `handler404`, `handler500` |
+| `config/views.py` | JSON error handlers `bad_request`, `not_found`, `server_error` (used when `DEBUG` is off) |
+| `config/tests.py` | Project-wide tests: error responses, token lifecycle, logging, response exposure, settings helpers |
+| `config/wsgi.py`, `config/asgi.py` | Server entry points (unchanged defaults) |
+| `accounts/models.py` | `User`: email login, a `name` field, no username |
+| `accounts/managers.py` | `UserManager`: creates users and superusers, normalises the email, hashes the password |
+| `accounts/serializers.py` | `RegisterSerializer`, `EmailTokenObtainPairSerializer` |
+| `accounts/views.py` | `RegisterView`, `LoginView` |
+| `patients/models.py` | `Patient`, with the `created_by` owner foreign key |
+| `patients/serializers.py` | `PatientSerializer`: field validation (date of birth, phone, gender) |
+| `patients/permissions.py` | `IsPatientOwner`: object-level backstop |
+| `patients/views.py` | List/create and detail views, with querysets scoped to the caller |
+| `doctors/models.py` | `Doctor`, with a nullable `created_by` |
+| `doctors/serializers.py` | `DoctorSerializer`: case-insensitive unique email |
+| `doctors/permissions.py` | `IsCreatorOrReadOnly` |
+| `doctors/views.py` | List/create and detail views; `DoctorInUse` (409) |
+| `mappings/models.py` | `PatientDoctorMapping`, unique per (patient, doctor) |
+| `mappings/serializers.py` | `PatientDoctorMappingSerializer`: `patient` field limited to the caller's patients |
+| `mappings/views.py` | `MappingListCreateView`, `MappingDetailView` |
+| `*/tests.py` | API tests for that app |
+| `*/migrations/` | Generated schema changes, committed to Git |
+| `postman/healthcare-backend.postman_collection.json` | Postman collection for manual and automated (newman) runs |
+| `README.md`, `docs/api.md` | Setup and usage; the API reference for clients |
 
 ## 6. Database interaction and transaction boundaries
 
@@ -268,16 +266,16 @@ Creating a mapping for another user's patient is the one exception: it gets a 40
 
 **Why 404 for patients but 403 for doctors?** Another user's patients are invisible to you; they aren't in your queryset at all. So the honest answer is "not found", and it reveals nothing. Doctors are visible to everyone, so "you can see it, but you may not change it" is a 403.
 
-**Security checklist** (ticked in Phase 6, with the evidence):
+**Security checklist**, with the evidence:
 
 - [x] Every patient and mapping query is filtered by `request.user` (the views' `get_queryset()` and lookups; `PatientIsolationTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`)
 - [x] `created_by` can never be written through the API (it isn't a serializer field; `test_owner_and_id_in_the_body_are_ignored`, `test_creator_and_id_in_the_body_are_ignored`)
 - [x] The mapping serializer's `patient` field only accepts the caller's patients (`test_another_users_patient_gets_the_same_error_as_a_missing_one`)
 - [x] No response contains a password hash or another user's id (`ResponseExposureTests`; the owner field `created_by` is never serialized)
-- [x] `IsAuthenticated` is included wherever `permission_classes` is overridden (`PatientDetailView`, `DoctorDetailView`); the one deliberate exception is `RegisterView` with `AllowAny` (rule S-3)
-- [x] `DEBUG` is off by default (verified in Phase 2; `SettingsHelperTests`)
+- [x] `IsAuthenticated` is included wherever `permission_classes` is overridden (`PatientDetailView`, `DoctorDetailView`); the one deliberate exception is `RegisterView` with `AllowAny`
+- [x] `DEBUG` is off by default (`SettingsHelperTests`)
 - [x] No stack traces reach clients (`ServerErrorTests`: a generic JSON 500 with `DEBUG` off; the traceback goes to the server log)
-- [x] Secrets live only in `.env`, and `.env` is not tracked by Git (verified in Phase 2 with `git check-ignore` and a secret scan)
+- [x] Secrets live only in `.env`, and `.env` is not tracked by Git (verified with `git check-ignore` and a scan of the full Git history)
 
 ## 9. Error-handling flow
 
@@ -287,15 +285,15 @@ flowchart TD
     kind -- "DRF APIException, Http404,<br/>PermissionDenied" --> drf["DRF exception handler<br/>JSON body + matching status"]
     kind -- "IntegrityError in a race" --> v400["caught at the savepoint<br/>re-raised as ValidationError: 400"]
     kind -- "ProtectedError on doctor delete" --> c409["caught in perform_destroy<br/>re-raised as DoctorInUse: 409"]
-    kind -- "anything else, i.e. a bug" --> e500["Django 500<br/>DEBUG off: generic message, no stack trace<br/>details go to the server log (LOGGING, Phase 6)"]
+    kind -- "anything else, i.e. a bug" --> e500["Django 500<br/>DEBUG off: generic message, no stack trace<br/>details go to the server log (LOGGING)"]
 ```
 
 - **Validation errors (400)** are raised by serializers. The body maps each field to a list of messages.
 - **Authentication and permission errors (401, 403)** are raised by DRF and SimpleJWT, with a `{"detail": ...}` body.
 - **Not found (404)** comes from `get_object_or_404` on a user-scoped queryset.
 - **Database constraint errors** are translated *where they happen* (in the save or delete), not by a global catch-all. That way an unrelated bug is never hidden behind a friendly message.
-- **Unexpected errors** return a 500 without internal details. With `DEBUG` off, the JSON handlers in `config/views.py` (Phase 6) make every error JSON: `handler500`, `handler404` for URLs that match no route, and `handler400` for requests Django rejects, such as a body over `DATA_UPLOAD_MAX_MEMORY_SIZE`.
-- **Server log:** with `DEBUG` off, Django's default logging sends 500 tracebacks only to `mail_admins`, which isn't configured, so they would be lost. This gap was found while reviewing the settings in Phase 2; since Phase 6, `LOGGING` writes `django.request` errors (500s, with tracebacks) and `django.security` errors to the console.
+- **Unexpected errors** return a 500 without internal details. With `DEBUG` off, the JSON handlers in `config/views.py` make every error JSON: `handler500`, `handler404` for URLs that match no route, and `handler400` for requests Django rejects, such as a body over `DATA_UPLOAD_MAX_MEMORY_SIZE`.
+- **Server log:** with `DEBUG` off, Django's default logging sends 500 tracebacks only to `mail_admins`, which isn't configured, so they would be lost. This gap was found while reviewing the settings; `LOGGING` now writes `django.request` errors (500s, with tracebacks) and `django.security` errors to the console.
 
 ## 10. Testing architecture
 
@@ -305,7 +303,7 @@ flowchart TD
 - **Data:** each test class creates two users (the owner and a stranger) and whatever objects it needs in `setUpTestData` or `setUp`. There are no shared JSON fixtures.
 - **Authentication in tests:** most tests use `force_authenticate(user)`, which is fast and focuses on the view's logic. Separate tests get a real token from `/api/auth/login/` and send it as `Authorization: Bearer ...`, because `force_authenticate` skips JWT verification completely.
 - **Assertions:** check the status code **and** the effect. After a forbidden DELETE, assert the row still exists. For list endpoints, assert the exact set of ids returned.
-- **API-client verification:** the Postman collection is run with newman against `runserver` in Phase 7.
+- **API-client verification:** the Postman collection is run with newman against `runserver`.
 
 ## 11. Environment configuration
 
@@ -322,7 +320,7 @@ flowchart TD
 | `DB_HOST` | no | `localhost` | Database host |
 | `DB_PORT` | no | `5432` | Database port |
 
-How the values are read (implemented in Phase 2):
+How the values are read:
 
 - A required variable that is missing or blank stops startup with `ImproperlyConfigured`, naming the variable.
 - `DJANGO_DEBUG` accepts true/false, 1/0, yes/no or on/off. Anything else stops startup, so a typo can't silently change behaviour.
@@ -344,7 +342,7 @@ flowchart TD
     g --> h["Register, log in, call the API"]
 ```
 
-Migration dependencies at the end of Phase 5:
+Migration dependencies:
 
 ```mermaid
 flowchart LR
@@ -355,13 +353,13 @@ flowchart LR
     doc --> map
 ```
 
-**Why the user model has to come first:** every foreign key to "the user" (`Patient.created_by`, `Doctor.created_by`, Django admin's log table) points at whatever `AUTH_USER_MODEL` was when it was first migrated. Switching from Django's built-in `auth.User` to `accounts.User` after those tables exist means rewriting the relations by hand, or resetting the database. Setting it before the first `migrate` costs nothing. That is why Phase 2 stops before `migrate`.
+**Why the user model has to come first:** every foreign key to "the user" (`Patient.created_by`, `Doctor.created_by`, Django admin's log table) points at whatever `AUTH_USER_MODEL` was when it was first migrated. Switching from Django's built-in `auth.User` to `accounts.User` after those tables exist means rewriting the relations by hand, or resetting the database. Setting it before the first `migrate` costs nothing. That is why the initial setup stopped before the first `migrate`.
 
 **Verification environments:**
 
-- **Phase 2:** verified in Claude's cloud workspace, on a private PostgreSQL 16.15 cluster that ran as an unprivileged OS user. Its superuser connected over a Unix socket with `peer` authentication; `healthcare_user` connected over TCP with a `scram-sha-256` password.
-- **Since 28 Oct (Phase 3 onward):** everything runs on Shubh's Windows machine, with PostgreSQL 18.6 installed as a local service on port 5432 and `healthcare_user` connecting over TCP to `localhost` with a password. The cloud workspace is no longer used.
+- **Initial setup:** verified on Linux, on a private PostgreSQL 16.15 cluster that ran as an unprivileged OS user. Its superuser connected over a Unix socket with `peer` authentication; `healthcare_user` connected over TCP with a `scram-sha-256` password.
+- **Since 28 Oct:** development and testing run on Windows, with PostgreSQL 18.6 installed as a local service on port 5432 and `healthcare_user` connecting over TCP to `localhost` with a password.
 
 ## 13. What a production deployment would add (out of scope)
 
-HTTPS and the `SECURE_*` settings (with `DEBUG` off, `python manage.py check --deploy` reports exactly these four in Phase 6: W004 `SECURE_HSTS_SECONDS`, W008 `SECURE_SSL_REDIRECT`, W012 `SESSION_COOKIE_SECURE`, W016 `CSRF_COOKIE_SECURE`; they need HTTPS, so they are left for a deployment); a WSGI or ASGI server (gunicorn or uvicorn) behind a reverse proxy; persistent database connections (`CONN_MAX_AGE`); structured logging; token blacklisting for logout; pagination; rate limiting backed by a shared cache; backups and audit logging for patient data.
+HTTPS and the `SECURE_*` settings (with `DEBUG` off, `python manage.py check --deploy` reports exactly these four: W004 `SECURE_HSTS_SECONDS`, W008 `SECURE_SSL_REDIRECT`, W012 `SESSION_COOKIE_SECURE`, W016 `CSRF_COOKIE_SECURE`; they need HTTPS, so they are left for a deployment); a WSGI or ASGI server (gunicorn or uvicorn) behind a reverse proxy; persistent database connections (`CONN_MAX_AGE`); structured logging; token blacklisting for logout; pagination; rate limiting backed by a shared cache; backups and audit logging for patient data.

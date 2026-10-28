@@ -399,4 +399,3 @@ The decisions that most affect API users:
 | [docs/design.md](docs/design.md) | Data model, validation rules, ownership, deletion behaviour, the API contract and error conventions |
 | [docs/architecture.md](docs/architecture.md) | Components, request lifecycle, authentication and authorization flows, configuration |
 | [docs/class.md](docs/class.md) | Every class in the project and what it does |
-| [docs/plan.md](docs/plan.md), [docs/memory.md](docs/memory.md) | Development plan and project status log |
