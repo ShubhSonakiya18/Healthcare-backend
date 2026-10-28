@@ -20,11 +20,11 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Stop with a clear message if this request needs a value that an earlier request should have saved.",
-          "// Requests without their own auth use the collection's Bearer {{accessA}}.",
+          "// Stop with a clear message if this request uses a value that an earlier request should have saved.",
+          "// Every request sets its own auth, so the variables it needs are named in the request itself.",
           "const requestText = JSON.stringify(pm.request.toJSON());",
           "const needed = ['accessA', 'refreshA', 'accessB', 'patientId', 'doctorId', 'mappingId'].filter(function (name) {",
-          "    return requestText.indexOf('{{' + name + '}}') !== -1 || (name === 'accessA' && !pm.request.auth);",
+          "    return requestText.indexOf('{{' + name + '}}') !== -1;",
           "});",
           "needed.forEach(function (name) {",
           "    if (!pm.collectionVariables.get(name)) {",
@@ -561,6 +561,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -597,6 +607,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -618,7 +638,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/patients/"
+            "url": "{{baseUrl}}/api/patients/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -638,7 +668,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -677,6 +717,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -711,6 +761,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -819,6 +879,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1004,6 +1074,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1040,6 +1120,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         }
@@ -1091,6 +1181,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1127,6 +1227,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1195,7 +1305,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/mappings/"
+            "url": "{{baseUrl}}/api/mappings/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1252,7 +1372,17 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/mappings/{{patientId}}/",
-            "description": "The number in this URL is a patient id."
+            "description": "The number in this URL is a patient id.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1272,7 +1402,17 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1292,7 +1432,17 @@
             "method": "DELETE",
             "header": [],
             "url": "{{baseUrl}}/api/mappings/{{mappingId}}/",
-            "description": "The number in this URL is a mapping id."
+            "description": "The number in this URL is a mapping id.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1312,7 +1462,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/mappings/{{patientId}}/"
+            "url": "{{baseUrl}}/api/mappings/{{patientId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         }
       ]
@@ -1337,7 +1497,17 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1357,7 +1527,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1376,7 +1556,17 @@
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1398,7 +1588,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessA}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         }
       ]
