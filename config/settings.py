@@ -166,3 +166,24 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
+
+# With DEBUG off, Django's default logging sends 500 tracebacks only to
+# mail_admins, which isn't configured, so they would be lost. These loggers
+# print them to the console (the server log) instead; clients still get only
+# a generic message.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+    },
+    "loggers": {
+        # Unhandled exceptions (500s), with their tracebacks.
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        # Requests Django rejects as suspicious, e.g. a body over the size limit.
+        "django.security": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}

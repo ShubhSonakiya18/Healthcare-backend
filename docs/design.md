@@ -181,7 +181,7 @@ Common rules for every endpoint:
 - Bodies are JSON (`Content-Type: application/json`). Every URL ends with `/`.
 - Protected endpoints need `Authorization: Bearer <access token>`. Without it → **401**.
 - Timestamps are ISO 8601 in UTC (e.g. `2026-10-28T05:30:00.123456Z`). Dates are `YYYY-MM-DD`.
-- Values in the examples are illustrative. Exact error texts are checked and recorded in Phase 6.
+- Values in the examples are illustrative. The exact error texts are in §8 (checked in Phase 6).
 
 ### 7.1 Authentication
 
@@ -390,24 +390,31 @@ Any other method on `/api/mappings/<id>/` → **405** [Proposed].
 
 ## 8. Error response conventions
 
-Our design [Proposed]; the assignment asks only for proper error handling and status codes.
+Our design [Proposed]; the assignment asks only for proper error handling and status codes. The texts below are exact: they were checked against the running code in Phase 6 (28 Oct 2026), and every row has a passing test.
 
-| Status | When | Body shape |
-|---|---|---|
-| 400 Bad Request | validation failed, malformed JSON, duplicate | `{"field": ["msg"]}`, `{"non_field_errors": ["msg"]}`, or `{"detail": "JSON parse error - ..."}` |
-| 401 Unauthorized | no token, bad or expired token, failed login | `{"detail": "..."}`; SimpleJWT adds `"code"` (and `"messages"`) for token problems |
-| 403 Forbidden | logged in but not allowed (editing another user's doctor) | `{"detail": "You do not have permission to perform this action."}` |
-| 404 Not Found | the object is missing or not the caller's; a non-integer id in the URL | `{"detail": "..."}` from DRF. A URL that matches no route gets Django's plain 404 page, unless the optional JSON handler is added in Phase 6 |
-| 405 Method Not Allowed | a method outside the contract (e.g. PATCH) | `{"detail": "Method \"PATCH\" not allowed."}` |
-| 409 Conflict | deleting a doctor who is still assigned | `{"detail": "..."}` |
-| 415 Unsupported Media Type | the body isn't JSON | `{"detail": "Unsupported media type \"...\" in request."}` |
-| 500 Internal Server Error | an unexpected bug | a generic message; no stack trace while `DEBUG` is off |
+| Status | When | Exact body | Verified by |
+|---|---|---|---|
+| 400 Bad Request | validation failed, or a duplicate | `{"<field>": ["<message>"]}` or `{"non_field_errors": ["<message>"]}`, e.g. `{"email": ["A user with this email already exists."]}`, `{"non_field_errors": ["This doctor is already assigned to this patient."]}` | `RegisterTests`, `PatientCreateTests`, `DoctorCreateTests`, `MappingCreateTests` |
+| 400 Bad Request | malformed JSON | `{"detail": "JSON parse error - <parser message>"}`, e.g. `... - Expecting property name enclosed in double quotes: line 1 column 18 (char 17)` | `ErrorResponseTests.test_malformed_json_is_400` |
+| 400 Bad Request | a body over `DATA_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB) | `{"detail": "Request body is too large."}` (JSON `handler400`) | `ErrorResponseTests.test_a_body_over_the_size_limit_is_rejected` |
+| 401 Unauthorized | no token | `{"detail": "Authentication credentials were not provided."}` | `PatientRequiresTokenTests`, `DoctorRequiresTokenTests`, `MappingRequiresTokenTests` |
+| 401 Unauthorized | a bad, expired or wrong-type Bearer token | `{"detail": "Given token not valid for any token type", "code": "token_not_valid", "messages": [...]}` | `PatientRealJwtTests`, `TokenLifecycleTests` |
+| 401 Unauthorized | the token's user was deactivated or deleted after login | `{"detail": "User is inactive", "code": "user_inactive"}`; for a deleted user `{"detail": "User not found", "code": "user_not_found"}` | `TokenLifecycleTests` |
+| 401 Unauthorized | a bad token sent to `/api/auth/token/refresh/` | `{"detail": "Token is invalid", "code": "token_not_valid"}`; the detail is `"Token is expired"` or `"Token has wrong type"` for those cases | `TokenRefreshTests`, `TokenWithoutDatabaseTests` |
+| 401 Unauthorized | failed login: wrong password, unknown email or inactive account | `{"detail": "No active account found with the given credentials"}` | `LoginTests` |
+| 403 Forbidden | changing or deleting another user's doctor | `{"detail": "You do not have permission to perform this action."}` | `DoctorPermissionTests` |
+| 404 Not Found | the object is missing or not the caller's | `{"detail": "No <Model> matches the given query."}`, e.g. `No Patient matches the given query.` | `PatientIsolationTests`, `MappingByPatientTests`, `MappingDeleteTests` |
+| 404 Not Found | a URL that matches no route, including a non-integer id | `{"detail": "Not found."}` (JSON `handler404`; with `DEBUG` on, Django's debug page instead) | `ErrorResponseTests.test_unmatched_urls_get_a_json_404` |
+| 405 Method Not Allowed | a method outside the contract (e.g. PATCH) | `{"detail": "Method \"PATCH\" not allowed."}` | `ErrorResponseTests.test_wrong_methods_are_405` |
+| 409 Conflict | deleting a doctor who is still assigned | `{"detail": "This doctor is assigned to one or more patients. Remove those assignments before deleting the doctor."}` | `DoctorInUseTests` |
+| 415 Unsupported Media Type | the body isn't JSON | `{"detail": "Unsupported media type \"application/x-www-form-urlencoded\" in request."}`, naming the request's content type | `ErrorResponseTests.test_non_json_bodies_are_415` |
+| 500 Internal Server Error | an unexpected bug | `{"detail": "A server error occurred."}`; no stack trace for the client, while the traceback goes to the server log (JSON `handler500`, `LOGGING`) | `ServerErrorTests` |
 
 No custom response envelope (like `{"success": ..., "data": ...}`) is used; responses follow DRF's standard shapes.
 
 ## 9. Edge cases (each one becomes a test)
 
-The expected behaviours follow from the approved decisions above; the assignment doesn't spell out any of them.
+The expected behaviours follow from the approved decisions above; the assignment doesn't spell out any of them. Every case below has an automated test (Phases 3–6).
 
 | # | Case | Expected |
 |---|---|---|

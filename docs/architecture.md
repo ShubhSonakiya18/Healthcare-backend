@@ -263,15 +263,15 @@ Creating a mapping for another user's patient is the one exception: it gets a 40
 
 **Why 404 for patients but 403 for doctors?** Another user's patients are invisible to you; they aren't in your queryset at all. So the honest answer is "not found", and it reveals nothing. Doctors are visible to everyone, so "you can see it, but you may not change it" is a 403.
 
-**Security checklist** (ticked in Phase 6):
+**Security checklist** (ticked in Phase 6, with the evidence):
 
-- [ ] Every patient and mapping query is filtered by `request.user`
-- [ ] `created_by` can never be written through the API
-- [ ] The mapping serializer's `patient` field only accepts the caller's patients
-- [ ] No response contains a password hash or another user's id
-- [ ] `IsAuthenticated` is included wherever `permission_classes` is overridden
-- [x] `DEBUG` is off by default (verified in Phase 2)
-- [ ] No stack traces reach clients
+- [x] Every patient and mapping query is filtered by `request.user` (the views' `get_queryset()` and lookups; `PatientIsolationTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`)
+- [x] `created_by` can never be written through the API (it isn't a serializer field; `test_owner_and_id_in_the_body_are_ignored`, `test_creator_and_id_in_the_body_are_ignored`)
+- [x] The mapping serializer's `patient` field only accepts the caller's patients (`test_another_users_patient_gets_the_same_error_as_a_missing_one`)
+- [x] No response contains a password hash or another user's id (`ResponseExposureTests`; the owner field `created_by` is never serialized)
+- [x] `IsAuthenticated` is included wherever `permission_classes` is overridden (`PatientDetailView`, `DoctorDetailView`); the one deliberate exception is `RegisterView` with `AllowAny` (rule S-3)
+- [x] `DEBUG` is off by default (verified in Phase 2; `SettingsHelperTests`)
+- [x] No stack traces reach clients (`ServerErrorTests`: a generic JSON 500 with `DEBUG` off; the traceback goes to the server log)
 - [x] Secrets live only in `.env`, and `.env` is not tracked by Git (verified in Phase 2 with `git check-ignore` and a secret scan)
 
 ## 9. Error-handling flow
@@ -289,14 +289,14 @@ flowchart TD
 - **Authentication and permission errors (401, 403)** are raised by DRF and SimpleJWT, with a `{"detail": ...}` body.
 - **Not found (404)** comes from `get_object_or_404` on a user-scoped queryset.
 - **Database constraint errors** are translated *where they happen* (in the save or delete), not by a global catch-all. That way an unrelated bug is never hidden behind a friendly message.
-- **Unexpected errors** return a 500 without internal details. The optional JSON `handler404` and `handler500` (Phase 6) make even these responses JSON.
-- **Server log:** with `DEBUG` off, Django's default logging sends 500 tracebacks only to `mail_admins`, which isn't configured, so they would be lost. Phase 6 adds a `LOGGING` setting that writes them to the console. This gap was found while reviewing the settings in Phase 2.
+- **Unexpected errors** return a 500 without internal details. With `DEBUG` off, the JSON handlers in `config/views.py` (Phase 6) make every error JSON: `handler500`, `handler404` for URLs that match no route, and `handler400` for requests Django rejects, such as a body over `DATA_UPLOAD_MAX_MEMORY_SIZE`.
+- **Server log:** with `DEBUG` off, Django's default logging sends 500 tracebacks only to `mail_admins`, which isn't configured, so they would be lost. This gap was found while reviewing the settings in Phase 2; since Phase 6, `LOGGING` writes `django.request` errors (500s, with tracebacks) and `django.security` errors to the console.
 
 ## 10. Testing architecture
 
 - `python manage.py test` makes Django create `test_healthcare_db` in PostgreSQL, apply every migration, run each test inside a transaction that is rolled back afterwards, and finally drop the database.
 - **Tools:** DRF's `APITestCase` and `APIClient`, which build on Django's `TestCase`.
-- **Layout:** one `tests.py` per app, organised by endpoint. A file is split into a `tests/` package only if it grows past about 400 lines.
+- **Layout:** one `tests.py` per app, organised by endpoint, plus `config/tests.py` for project-wide behaviour (error responses, logging, settings helpers). A file is split into a `tests/` package only if it grows past about 400 lines.
 - **Data:** each test class creates two users (the owner and a stranger) and whatever objects it needs in `setUpTestData` or `setUp`. There are no shared JSON fixtures.
 - **Authentication in tests:** most tests use `force_authenticate(user)`, which is fast and focuses on the view's logic. Separate tests get a real token from `/api/auth/login/` and send it as `Authorization: Bearer ...`, because `force_authenticate` skips JWT verification completely.
 - **Assertions:** check the status code **and** the effect. After a forbidden DELETE, assert the row still exists. For list endpoints, assert the exact set of ids returned.
@@ -356,4 +356,4 @@ flowchart LR
 
 ## 13. What a production deployment would add (out of scope)
 
-HTTPS and the `SECURE_*` settings; a WSGI or ASGI server (gunicorn or uvicorn) behind a reverse proxy; persistent database connections (`CONN_MAX_AGE`); structured logging; token blacklisting for logout; pagination; rate limiting backed by a shared cache; backups and audit logging for patient data.
+HTTPS and the `SECURE_*` settings (with `DEBUG` off, `python manage.py check --deploy` reports exactly these four in Phase 6: W004 `SECURE_HSTS_SECONDS`, W008 `SECURE_SSL_REDIRECT`, W012 `SESSION_COOKIE_SECURE`, W016 `CSRF_COOKIE_SECURE`; they need HTTPS, so they are left for a deployment); a WSGI or ASGI server (gunicorn or uvicorn) behind a reverse proxy; persistent database connections (`CONN_MAX_AGE`); structured logging; token blacklisting for logout; pagination; rate limiting backed by a shared cache; backups and audit logging for patient data.

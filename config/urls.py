@@ -25,3 +25,8 @@ urlpatterns = [
     path("api/doctors/", include("doctors.urls")),
     path("api/mappings/", include("mappings.urls")),
 ]
+
+# JSON instead of Django's HTML error pages when DEBUG is off.
+handler400 = "config.views.bad_request"
+handler404 = "config.views.not_found"
+handler500 = "config.views.server_error"

@@ -2,7 +2,7 @@
 
 **Status legend:** 🟡 Proposed (not written yet) · 🟢 Implemented (exists in code and is tested) · 🔴 Removed
 
-The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5; Phase 5 added §6 and `DoctorInUse`.
+The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5; Phase 5 added §6 and `DoctorInUse`; Phase 6 added the JSON error handlers in §7.
 
 **Related:** [design.md](design.md) (fields and contracts) · [architecture.md](architecture.md) (how requests flow)
 
@@ -355,7 +355,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ### `config/settings.py` helpers 🟢 (Phase 2)
 
-Implemented, and verified by running each failure case by hand in Phase 2.
+Implemented in Phase 2 and verified then by running each failure case by hand; since Phase 6 also covered by `SettingsHelperTests` in `config/tests.py`.
 
 | Function | What it does | Used for |
 |---|---|---|
@@ -369,11 +369,21 @@ Implemented, and verified by running each failure case by hand in Phase 2.
 
 | Module | Patterns |
 |---|---|
-| `config/urls.py` | Phase 2: `admin/` only, as generated. Planned: `api/auth/` → `accounts.urls`; `api/patients/` → `patients.urls`; `api/doctors/` → `doctors.urls`; `api/mappings/` → `mappings.urls` |
+| `config/urls.py` | `admin/`; `api/auth/` → `accounts.urls`; `api/patients/` → `patients.urls`; `api/doctors/` → `doctors.urls`; `api/mappings/` → `mappings.urls`. Also `handler400`, `handler404` and `handler500` → `config/views.py` |
 | `accounts/urls.py` | `register/`, `login/`, `token/refresh/` |
 | `patients/urls.py` | `""` (list/create), `<int:pk>/` (detail) |
 | `doctors/urls.py` | `""` (list/create), `<int:pk>/` (detail) |
 | `mappings/urls.py` | `""` (list/create), `<int:pk>/` (GET by patient id, DELETE by mapping id) |
+
+### `config/views.py` error handlers 🟢 (Phase 6)
+
+Functions, not classes. Django calls them only when `DEBUG` is off; errors inside DRF views are already answered by DRF.
+
+| Function | Answers | Body |
+|---|---|---|
+| `bad_request(request, exception)` | a request Django rejects, such as a body over `DATA_UPLOAD_MAX_MEMORY_SIZE` | 400 `{"detail": "Request body is too large."}` or `{"detail": "Bad request."}` |
+| `not_found(request, exception)` | a URL that matches no route | 404 `{"detail": "Not found."}` |
+| `server_error(request)` | an unexpected exception; the traceback goes to the server log (`LOGGING`) | 500 `{"detail": "A server error occurred."}` |
 
 ## 8. Library classes we rely on (not ours)
 
@@ -398,5 +408,6 @@ All rows are implemented (🟢): `accounts` in Phase 3, `patients` and `doctors`
 | 🟢 `PatientRequiresTokenTests`, `PatientRealJwtTests`, `PatientCreateTests`, `PatientReadUpdateDeleteTests`, `PatientIsolationTests`, `IsPatientOwnerTests` | `patients/tests.py` | CRUD and validation; no token → 401; real JWT; two-user isolation; `IsPatientOwner` unit test |
 | 🟢 `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `DoctorInUseTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race; 409 while assigned |
 | 🟢 `MappingRequiresTokenTests`, `MappingRealJwtTests`, `MappingCreateTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`, `MappingCascadeTests` | `mappings/tests.py` | Assign, list (one query), by patient, delete; duplicates and the duplicate race; two-user isolation; patient id vs mapping id; patient delete cascades |
+| 🟢 `ErrorResponseTests`, `TokenLifecycleTests`, `ServerErrorTests`, `ResponseExposureTests`, `SettingsHelperTests` | `config/tests.py` | Phase 6, project-wide: malformed JSON, 415, every 405, JSON 404, missing slash, oversized body; expired and deactivated tokens over HTTP; generic 500 plus the logged traceback; no password data or owner ids in responses; the settings helpers |
 
 Each app also has at least one test that logs in through `/api/auth/login/` and uses the real token.
