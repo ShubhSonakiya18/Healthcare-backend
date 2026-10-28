@@ -4,7 +4,7 @@ This is the reference for clients of the Healthcare Backend API: every endpoint,
 
 **Assignment requirement or our design?** For each endpoint the assignment specifies only the method, the path and a one-line purpose. Everything else on this page is our design: request and response bodies, field names, validation rules, status codes and error messages. In particular, the mapping object returned by the mapping endpoints is our design, not an assignment requirement.
 
-**About the examples:** ids, names, timestamps and tokens are illustrative; yours will differ. Field names, status codes and error messages are exact: they were taken from the project's code and the installed libraries. Every status code is covered by an automated test; [design.md §8](design.md#8-error-response-conventions) names the tests.
+**About the examples:** ids, names, timestamps and tokens are illustrative; yours will differ. Field names, status codes and error messages are exact: they were taken from the project's code and the installed libraries. Every status code is covered by an automated test; [design.md section 8](design.md#8-error-response-conventions) names the tests.
 
 ## Contents
 

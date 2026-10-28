@@ -1,6 +1,6 @@
 # Data and API Design
 
-**Status:** Approved 27 Oct 2026. Implemented in Phases 3–6 (28 Oct 2026). Update this file whenever the code changes, so it always describes the real system.
+**Status:** Approved 27 Oct 2026. Implemented 28 Oct 2026. Update this file whenever the code changes, so it always describes the real system.
 **Related:** [architecture.md](architecture.md) (how it fits together) · [class.md](class.md) (classes) · [api.md](api.md) (reference for API clients)
 
 **Assignment requirement or our design?** The assignment fixes the stack and, for each endpoint, only the method, the path and a one-line purpose. Everything else in this document is our design, approved on 27 Oct 2026: fields, constraints, deletion rules, request and response bodies, status codes and error messages. Tags and "Source" columns show which is which: **[Spec]** comes from the assignment; **[Proposed]** is our decision.
@@ -54,7 +54,7 @@ erDiagram
     }
 ```
 
-In plain words:
+In short:
 
 - A **user** creates many **patients**. Each patient has exactly one creator, who is its owner.
 - A user can add many **doctors**. If that user is ever deleted, the doctor stays and its `created_by` becomes empty (NULL).
@@ -140,7 +140,7 @@ Meta: `UniqueConstraint(fields=["patient", "doctor"], name="unique_patient_docto
 | No duplicate mapping | `UniqueTogetherValidator` on the serializer, plus the DB constraint | 400 `{"non_field_errors": ["This doctor is already assigned to this patient."]}` |
 | Server-controlled fields (`id`, `created_by`, timestamps) | read-only, or not on the serializer at all | silently ignored if sent |
 
-**Ordering gotcha (worth knowing for the interview):** DRF runs a field's validators, including `UniqueValidator`, *before* the `validate_email()` method that lower-cases the value. A normal case-sensitive uniqueness check would therefore let `Asha@Example.com` through when `asha@example.com` exists, and the database would then reject the insert. That is why both unique validators use `lookup="iexact"`.
+**Ordering gotcha:** DRF runs a field's validators, including `UniqueValidator`, *before* the `validate_email()` method that lower-cases the value. A normal case-sensitive uniqueness check would therefore let `Asha@Example.com` through when `asha@example.com` exists, and the database would then reject the insert. That is why both unique validators use `lookup="iexact"`.
 
 ## 4. Uniqueness constraints
 
@@ -175,7 +175,7 @@ There is no API endpoint for deleting users; that can only happen through Django
 
 ## 7. API contracts
 
-**What the assignment fixes, and what we designed.** For each endpoint the assignment gives only the method, the path and a one-line purpose; the headings below mark those **[Spec]**. Request bodies, response bodies, field names, status codes and error messages are **our design** (approved 27 Oct 2026). The approved contract is frozen: changing any part of it needs a new, documented design decision and Shubh's explicit approval.
+**What the assignment fixes, and what we designed.** For each endpoint the assignment gives only the method, the path and a one-line purpose; the headings below mark those **[Spec]**. Request bodies, response bodies, field names, status codes and error messages are **our design** (approved 27 Oct 2026). The approved contract is frozen: changing any part of it needs a new, documented design decision.
 
 This section is the design record. For API clients, [api.md](api.md) presents the same contract endpoint by endpoint, with every field rule and error message.
 
@@ -185,7 +185,7 @@ Common rules for every endpoint:
 - Bodies are JSON (`Content-Type: application/json`). Every URL ends with `/`.
 - Protected endpoints need `Authorization: Bearer <access token>`. Without it → **401**.
 - Timestamps are ISO 8601 in UTC (e.g. `2026-10-28T05:30:00.123456Z`). Dates are `YYYY-MM-DD`.
-- Values in the examples are illustrative. The exact error texts are in §8 (checked in Phase 6).
+- Values in the examples are illustrative. The exact error texts are in section 8.
 
 ### 7.1 Authentication
 
@@ -394,7 +394,7 @@ Any other method on `/api/mappings/<id>/` → **405** [Proposed].
 
 ## 8. Error response conventions
 
-Our design [Proposed]; the assignment asks only for proper error handling and status codes. The texts below are exact: they were checked against the running code in Phase 6 (28 Oct 2026), and every row has a passing test.
+Our design [Proposed]; the assignment asks only for proper error handling and status codes. The texts below are exact: they were checked against the running code on 28 Oct 2026, and every row has a passing test.
 
 | Status | When | Exact body | Verified by |
 |---|---|---|---|
@@ -418,7 +418,7 @@ No custom response envelope (like `{"success": ..., "data": ...}`) is used; resp
 
 ## 9. Edge cases (each one becomes a test)
 
-The expected behaviours follow from the approved decisions above; the assignment doesn't spell out any of them. Every case below has an automated test (Phases 3–6).
+The expected behaviours follow from the approved decisions above; the assignment doesn't spell out any of them. Every case below has an automated test.
 
 | # | Case | Expected |
 |---|---|---|
@@ -427,11 +427,11 @@ The expected behaviours follow from the approved decisions above; the assignment
 | E3 | Login with a different letter case in the email | 200 |
 | E4 | Login as an inactive user | 401 |
 | E5 | Password equal or very similar to the email or name | 400 |
-| E6 | Token belonging to a user who was deactivated or deleted after login | 401 (exact behaviour verified in Phase 3) |
+| E6 | Token belonging to a user who was deactivated or deleted after login | 401 |
 | E7 | Tampered token, or a refresh token sent as the Bearer token | 401 |
 | E8 | Access token sent to the refresh endpoint | 401 |
 | E9 | `/api/patients/abc/` | 404 (the URL pattern only accepts integers) |
-| E10 | A huge id, e.g. `/api/patients/99999999999999999999/` | 404, not 500 (verified in Phase 4) |
+| E10 | A huge id, e.g. `/api/patients/99999999999999999999/` | 404, not 500 |
 | E11 | PUT that includes `created_by` or `id` in the body | ignored; the owner doesn't change |
 | E12 | PUT without `name` | 400 |
 | E13 | Date of birth tomorrow / today | 400 / 201 |

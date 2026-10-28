@@ -13,7 +13,7 @@ class PatientDoctorMapping(models.Model):
     so the owner is always `patient.created_by`.
     """
 
-    # CASCADE: an assignment without its patient means nothing (design.md §6).
+    # CASCADE: an assignment without its patient means nothing.
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="doctor_mappings")
     # PROTECT: deleting a doctor must never silently remove other users'
     # assignments. DoctorDetailView turns the refusal into a 409.

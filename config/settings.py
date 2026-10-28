@@ -161,7 +161,7 @@ REST_FRAMEWORK = {
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
 
-# SimpleJWT. Tokens are signed with HS256 using SECRET_KEY.
+# SimpleJWT: tokens are signed with HS256 using SECRET_KEY.
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),

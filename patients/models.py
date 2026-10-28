@@ -17,7 +17,7 @@ class Patient(models.Model):
         OTHER = "other", "Other"
 
     # CASCADE: patients are private to their creator, so they go when the
-    # user goes (design.md §6).
+    # user goes.
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="patients"
     )

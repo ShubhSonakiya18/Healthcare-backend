@@ -1,6 +1,5 @@
-"""Project-wide behaviour (Phase 6): error responses, the token lifecycle,
-server-error logging, what responses expose, and the settings helpers
-(design.md §8 and §9).
+"""Project-wide behaviour: error responses, the token lifecycle,
+server-error logging, what responses expose, and the settings helpers.
 
 Run with: python manage.py test config   (`python manage.py test` runs everything)
 """
@@ -51,7 +50,7 @@ handler500 = project_urls.handler500
 
 
 class ErrorResponseTests(APITestCase):
-    """Every error the API can return is JSON with the documented status (design.md §8)."""
+    """Every error the API can return is JSON with the documented status."""
 
     @classmethod
     def setUpTestData(cls):
@@ -117,7 +116,7 @@ class ErrorResponseTests(APITestCase):
                 self.assertEqual(response.json(), {"detail": "Not found."})
 
     def test_a_missing_trailing_slash_redirects_and_saves_nothing(self):
-        # design.md E18: with DEBUG off, Django redirects to the URL with a
+        # With DEBUG off, Django redirects to the URL with a
         # slash, and the redirect drops the body. Clients must use the slash.
         response = self.client.post("/api/patients", {"name": "Rahul", "date_of_birth": "1990-04-12"})
         self.assertEqual(response.status_code, status.HTTP_301_MOVED_PERMANENTLY)
@@ -137,7 +136,7 @@ class ErrorResponseTests(APITestCase):
 
 
 class TokenLifecycleTests(APITestCase):
-    """design.md E6 and E28, over HTTP against a protected endpoint."""
+    """Expired tokens, and tokens of users deactivated or deleted after login, over HTTP."""
 
     def setUp(self):
         self.user = User.objects.create_user(email="owner@example.com", password=PASSWORD, name="Owner")
@@ -176,7 +175,7 @@ class TokenLifecycleTests(APITestCase):
 @override_settings(ROOT_URLCONF=__name__)
 class ServerErrorTests(APITestCase):
     """An unexpected exception: a generic JSON 500 for the client, the full
-    traceback in the server log (the gap found in Phase 2)."""
+    traceback in the server log."""
 
     def test_unexpected_error_returns_a_generic_500_and_logs_the_traceback(self):
         self.client.raise_request_exception = False
@@ -198,7 +197,7 @@ class ServerErrorTests(APITestCase):
 
 
 class ResponseExposureTests(APITestCase):
-    """No response body contains password data or an owner field (architecture.md §8)."""
+    """No response body contains password data or an owner field."""
 
     def test_no_response_exposes_password_data_or_owner_ids(self):
         bodies = []

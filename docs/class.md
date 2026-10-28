@@ -1,8 +1,6 @@
 # Class Reference
 
-**Status legend:** 🟡 Proposed (not written yet) · 🟢 Implemented (exists in code and is tested) · 🔴 Removed
-
-The assignment names no classes; everything here is our design. Classes stay 🟡 **Proposed** until their phase is done; then each entry is updated to match the real code. This file must never describe classes that don't exist. Phase 2 added no classes, only the settings helpers in §7. Phase 3 added the `accounts` classes in §3. Phase 4 added §4 and §5; Phase 5 added §6 and `DoctorInUse`; Phase 6 added the JSON error handlers in §7.
+The assignment names no classes; everything here is our design. Every class listed here exists in the code and is covered by tests, and this file is updated whenever the code changes.
 
 **Related:** [design.md](design.md) (fields and contracts) · [architecture.md](architecture.md) (how requests flow)
 
@@ -84,9 +82,9 @@ flowchart LR
 
 ## 3. accounts
 
-> **Phase 3:** implemented and verified on 28 Oct 2026. `python manage.py test accounts` on PostgreSQL 18.6: 49 tests run, 49 passed.
+> Tested by `accounts/tests.py` (49 tests, run on PostgreSQL).
 
-### `User` 🟢
+### `User`
 
 | | |
 |---|---|
@@ -99,9 +97,7 @@ flowchart LR
 | **Used by** | `RegisterSerializer`; SimpleJWT (login, and turning a token back into a user); `Patient.created_by`; `Doctor.created_by`; `createsuperuser` |
 | **Concepts** | Custom user model, `AUTH_USER_MODEL`, abstract base classes, model fields |
 
-**In plain words:** Django's normal user logs in with a username. Ours logs in with an email and has one `name` field. It has to exist before the first migration, because other tables point at it.
-
-### `UserManager` 🟢
+### `UserManager`
 
 | | |
 |---|---|
@@ -113,9 +109,7 @@ flowchart LR
 | **Uses** | `User` (via `self.model`), `set_password()` |
 | **Concepts** | Model managers, `use_in_migrations` |
 
-**In plain words:** the default manager expects a username; ours expects an email. Because `create_user()` calls `set_password()`, the plain password never reaches the database.
-
-### `RegisterSerializer` 🟢
+### `RegisterSerializer`
 
 | | |
 |---|---|
@@ -128,9 +122,7 @@ flowchart LR
 | **Uses** | `User`, `UserManager`, Django's password validators |
 | **Concepts** | `ModelSerializer`, field-level vs object-level validation, `write_only` |
 
-**In plain words:** it checks the data is good, then asks the manager to create the user. The password goes in and never comes back out.
-
-### `EmailTokenObtainPairSerializer` 🟢
+### `EmailTokenObtainPairSerializer`
 
 | | |
 |---|---|
@@ -143,9 +135,7 @@ flowchart LR
 | **Uses** | Django's `authenticate()`, which uses `ModelBackend` and `User` |
 | **Concepts** | Extending a library class instead of rewriting it |
 
-**In plain words:** SimpleJWT's standard login, plus one line so that `Asha@Example.com` can log in to the account stored as `asha@example.com`.
-
-### `RegisterView` 🟢
+### `RegisterView`
 
 | | |
 |---|---|
@@ -156,9 +146,7 @@ flowchart LR
 | **URL** | `api/auth/register/` (name `auth-register`) |
 | **Concepts** | Generic views; overriding the global permission default |
 
-**In plain words:** together with login, the only open door. It deliberately overrides the global "must be logged in" rule.
-
-### `LoginView` 🟢
+### `LoginView`
 
 | | |
 |---|---|
@@ -168,8 +156,6 @@ flowchart LR
 | **URL** | `api/auth/login/` (name `auth-login`) |
 | **Note** | SimpleJWT's token views set empty `authentication_classes` and `permission_classes`, so they are public even with our global default |
 
-**In plain words:** this isn't Django's own `LoginView` (that one is for HTML session login). It returns JWTs.
-
 ### `TokenRefreshView` (from SimpleJWT, used unchanged)
 
 URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint beyond the assignment's. It takes `{"refresh": ...}` and returns `{"access": ...}`.
@@ -178,9 +164,9 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 
 ## 4. patients
 
-> **Phase 4:** implemented and verified on 28 Oct 2026. `python manage.py test patients` on PostgreSQL 18.6 (26 tests) passed as part of a 94-test run.
+> Tested by `patients/tests.py` (26 tests, run on PostgreSQL).
 
-### `Patient` 🟢
+### `Patient`
 
 | | |
 |---|---|
@@ -193,7 +179,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Used by** | `PatientSerializer`, the patient views, `PatientDoctorMapping.patient` |
 | **Concepts** | `ForeignKey`, `on_delete`, `choices`, validators, `auto_now` / `auto_now_add` |
 
-### `PatientSerializer` 🟢
+### `PatientSerializer`
 
 | | |
 |---|---|
@@ -203,9 +189,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `validate_date_of_birth(value)` rejects future dates |
 | **Used by** | `PatientListCreateView`, `PatientDetailView` |
 
-**In plain words:** it converts patients to JSON and checks incoming data. It knows nothing about ownership; the view takes care of that.
-
-### `IsPatientOwner` 🟢
+### `IsPatientOwner`
 
 | | |
 |---|---|
@@ -215,9 +199,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Used by** | `PatientDetailView`, together with `IsAuthenticated` |
 | **Tested by** | A direct unit test. Through the API it can't be triggered, because the queryset already hides other users' patients. |
 
-**In plain words:** a second lock on the door. The queryset already hides other users' patients; this check still protects them if someone later widens the queryset.
-
-### `PatientListCreateView` 🟢
+### `PatientListCreateView`
 
 | | |
 |---|---|
@@ -226,9 +208,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `get_queryset()` returns `Patient.objects.filter(created_by=self.request.user)`; `perform_create(serializer)` calls `serializer.save(created_by=self.request.user)` |
 | **URL** | `api/patients/` (name `patient-list`) |
 
-**In plain words:** GET lists your patients; POST creates one and stamps you as its owner.
-
-### `PatientDetailView` 🟢
+### `PatientDetailView`
 
 | | |
 |---|---|
@@ -238,15 +218,13 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | The same scoped `get_queryset()` as the list view |
 | **URL** | `api/patients/<int:pk>/` (name `patient-detail`) |
 
-**In plain words:** because the queryset only contains your patients, asking for someone else's id gives a 404.
-
 ---
 
 ## 5. doctors
 
-> **Phases 4–5:** implemented and verified on 28 Oct 2026 (`DoctorInUse` in Phase 5). `python manage.py test doctors` on PostgreSQL 18.6 (21 tests) passed as part of a 118-test run.
+> Tested by `doctors/tests.py` (21 tests, run on PostgreSQL).
 
-### `Doctor` 🟢
+### `Doctor`
 
 | | |
 |---|---|
@@ -255,7 +233,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `__str__()` returns the name |
 | **Used by** | `DoctorSerializer`, the doctor views, `PatientDoctorMapping.doctor` |
 
-### `DoctorSerializer` 🟢
+### `DoctorSerializer`
 
 | | |
 |---|---|
@@ -264,7 +242,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `validate_email()` trims and lower-cases (via `User.objects.normalize_email()`); the email field uses `UniqueValidator(lookup="iexact")`; `save()` runs inside `transaction.atomic()` and turns an `IntegrityError` from a simultaneous duplicate into the same 400 on `email` |
 | **Used by** | The doctor views; nested inside `PatientDoctorMappingSerializer` as `doctor_detail` |
 
-### `IsCreatorOrReadOnly` 🟢
+### `IsCreatorOrReadOnly`
 
 | | |
 |---|---|
@@ -272,7 +250,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `has_object_permission()` returns True for safe methods (GET, HEAD, OPTIONS); otherwise `obj.created_by_id == request.user.id`. A NULL creator never matches, so the result is 403. |
 | **Used by** | `DoctorDetailView` |
 
-### `DoctorListCreateView` 🟢
+### `DoctorListCreateView`
 
 | | |
 |---|---|
@@ -281,7 +259,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key attributes and methods** | `queryset = Doctor.objects.all()`; `perform_create()` sets `created_by` |
 | **URL** | `api/doctors/` (name `doctor-list`) |
 
-### `DoctorDetailView` 🟢
+### `DoctorDetailView`
 
 | | |
 |---|---|
@@ -291,7 +269,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `perform_destroy(instance)`: deletes, but catches `ProtectedError` (from the mapping's `PROTECT`) and raises `DoctorInUse` (409); nothing is deleted |
 | **URL** | `api/doctors/<int:pk>/` (name `doctor-detail`) |
 
-### `DoctorInUse` 🟢
+### `DoctorInUse`
 
 | | |
 |---|---|
@@ -299,15 +277,13 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Inherits** | `rest_framework.exceptions.APIException` |
 | **Key attributes** | `status_code = 409`; `default_detail = "This doctor is assigned to one or more patients. Remove those assignments before deleting the doctor."`; `default_code = "doctor_in_use"` |
 
-**In plain words:** a custom error type that DRF already knows how to turn into a JSON response.
-
 ---
 
 ## 6. mappings
 
-> **Phase 5:** implemented and verified on 28 Oct 2026. `python manage.py test mappings` on PostgreSQL 18.6 (22 tests) passed as part of a 118-test run.
+> Tested by `mappings/tests.py` (22 tests, run on PostgreSQL).
 
-### `PatientDoctorMapping` 🟢
+### `PatientDoctorMapping`
 
 | | |
 |---|---|
@@ -316,7 +292,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Meta** | `constraints = [UniqueConstraint(fields=["patient", "doctor"], name="unique_patient_doctor")]`; `ordering = ["id"]` |
 | **Key methods** | `__str__()` returns "patient → doctor" |
 
-### `PatientDoctorMappingSerializer` 🟢
+### `PatientDoctorMappingSerializer`
 
 | | |
 |---|---|
@@ -327,9 +303,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Meta.validators** | `UniqueTogetherValidator(queryset=PatientDoctorMapping.objects.all(), fields=["patient", "doctor"], message="This doctor is already assigned to this patient.")` |
 | **Used by** | Both mapping views |
 
-**In plain words:** the `patient` field only "knows about" your patients, so another user's patient id looks exactly like an id that doesn't exist.
-
-### `MappingListCreateView` 🟢
+### `MappingListCreateView`
 
 | | |
 |---|---|
@@ -338,7 +312,7 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `get_queryset()` returns `PatientDoctorMapping.objects.filter(patient__created_by=user).select_related("patient", "doctor")`; `perform_create()` saves inside `transaction.atomic()` and turns an `IntegrityError` into the duplicate 400 |
 | **URL** | `api/mappings/` (name `mapping-list`) |
 
-### `MappingDetailView` 🟢
+### `MappingDetailView`
 
 | | |
 |---|---|
@@ -347,23 +321,19 @@ URL `api/auth/token/refresh/` (name `auth-token-refresh`), an extra endpoint bey
 | **Key methods** | `get(request, pk)`: **`pk` is a patient id**. Finds the patient with `get_object_or_404(Patient, pk=pk, created_by=request.user)` and returns that patient's mappings (200). `delete(request, pk)`: **`pk` is a mapping id**. Finds it with `get_object_or_404(PatientDoctorMapping, pk=pk, patient__created_by=request.user)`, deletes it, returns 204. |
 | **URL** | `api/mappings/<int:pk>/` (name `mapping-detail`) |
 
-**In plain words:** one URL with two meanings, because Django chooses the view by path only.
-
 ---
 
 ## 7. Project configuration and URL modules (not classes)
 
-### `config/settings.py` helpers 🟢 (Phase 2)
+### `config/settings.py` helpers
 
-Implemented in Phase 2 and verified then by running each failure case by hand; since Phase 6 also covered by `SettingsHelperTests` in `config/tests.py`.
+Covered by `SettingsHelperTests` in `config/tests.py`; each failure case was also checked by hand when the helpers were written.
 
 | Function | What it does | Used for |
 |---|---|---|
 | `env_required(name)` | Returns the variable; raises `ImproperlyConfigured`, naming it, if it is missing or blank | `DJANGO_SECRET_KEY`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` |
 | `env_bool(name, default)` | Accepts true/false, 1/0, yes/no or on/off. An empty value gives the default; anything else raises `ImproperlyConfigured` | `DJANGO_DEBUG` (default `False`) |
 | `env_list(name, default)` | Splits a comma-separated value into a list, dropping blanks | `DJANGO_ALLOWED_HOSTS` |
-
-**In plain words:** settings are read once, when Django starts. If something essential is missing, the server refuses to start and names the variable to set, instead of running half-configured or insecure.
 
 ### URL modules
 
@@ -375,7 +345,7 @@ Implemented in Phase 2 and verified then by running each failure case by hand; s
 | `doctors/urls.py` | `""` (list/create), `<int:pk>/` (detail) |
 | `mappings/urls.py` | `""` (list/create), `<int:pk>/` (GET by patient id, DELETE by mapping id) |
 
-### `config/views.py` error handlers 🟢 (Phase 6)
+### `config/views.py` error handlers
 
 Functions, not classes. Django calls them only when `DEBUG` is off; errors inside DRF views are already answered by DRF.
 
@@ -400,14 +370,12 @@ Functions, not classes. Django calls them only when `DEBUG` is off; errors insid
 
 ## 9. Test classes
 
-All rows are implemented (🟢): `accounts` in Phase 3, `patients` and `doctors` in Phase 4, `mappings` and the doctor 409 tests in Phase 5.
-
 | Class | File | Covers |
 |---|---|---|
-| 🟢 No database: `UserModelDefinitionTests`, `UserManagerUnitTests`, `PasswordPolicyTests`, `RegisterEndpointWithoutDatabaseTests`, `TokenWithoutDatabaseTests`. PostgreSQL: `UserManagerTests`, `RegisterTests`, `LoginTests`, `RealJwtFlowTests`, `TokenRefreshTests` | `accounts/tests.py` | User model and manager, password policy, registration, login, refresh, real-JWT flow, `createsuperuser` |
-| 🟢 `PatientRequiresTokenTests`, `PatientRealJwtTests`, `PatientCreateTests`, `PatientReadUpdateDeleteTests`, `PatientIsolationTests`, `IsPatientOwnerTests` | `patients/tests.py` | CRUD and validation; no token → 401; real JWT; two-user isolation; `IsPatientOwner` unit test |
-| 🟢 `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `DoctorInUseTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race; 409 while assigned |
-| 🟢 `MappingRequiresTokenTests`, `MappingRealJwtTests`, `MappingCreateTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`, `MappingCascadeTests` | `mappings/tests.py` | Assign, list (one query), by patient, delete; duplicates and the duplicate race; two-user isolation; patient id vs mapping id; patient delete cascades |
-| 🟢 `ErrorResponseTests`, `TokenLifecycleTests`, `ServerErrorTests`, `ResponseExposureTests`, `SettingsHelperTests` | `config/tests.py` | Phase 6, project-wide: malformed JSON, 415, every 405, JSON 404, missing slash, oversized body; expired and deactivated tokens over HTTP; generic 500 plus the logged traceback; no password data or owner ids in responses; the settings helpers |
+| No database: `UserModelDefinitionTests`, `UserManagerUnitTests`, `PasswordPolicyTests`, `RegisterEndpointWithoutDatabaseTests`, `TokenWithoutDatabaseTests`. PostgreSQL: `UserManagerTests`, `RegisterTests`, `LoginTests`, `RealJwtFlowTests`, `TokenRefreshTests` | `accounts/tests.py` | User model and manager, password policy, registration, login, refresh, real-JWT flow, `createsuperuser` |
+| `PatientRequiresTokenTests`, `PatientRealJwtTests`, `PatientCreateTests`, `PatientReadUpdateDeleteTests`, `PatientIsolationTests`, `IsPatientOwnerTests` | `patients/tests.py` | CRUD and validation; no token → 401; real JWT; two-user isolation; `IsPatientOwner` unit test |
+| `DoctorRequiresTokenTests`, `DoctorRealJwtTests`, `DoctorCreateTests`, `DoctorReadTests`, `DoctorPermissionTests`, `DoctorInUseTests`, `IsCreatorOrReadOnlyTests` | `doctors/tests.py` | CRUD and validation; no token → 401; real JWT; creator-only writes; duplicate race; 409 while assigned |
+| `MappingRequiresTokenTests`, `MappingRealJwtTests`, `MappingCreateTests`, `MappingListTests`, `MappingByPatientTests`, `MappingDeleteTests`, `MappingCascadeTests` | `mappings/tests.py` | Assign, list (one query), by patient, delete; duplicates and the duplicate race; two-user isolation; patient id vs mapping id; patient delete cascades |
+| `ErrorResponseTests`, `TokenLifecycleTests`, `ServerErrorTests`, `ResponseExposureTests`, `SettingsHelperTests` | `config/tests.py` | Project-wide: malformed JSON, 415, every 405, JSON 404, missing slash, oversized body; expired and deactivated tokens over HTTP; generic 500 plus the logged traceback; no password data or owner ids in responses; the settings helpers |
 
 Each app also has at least one test that logs in through `/api/auth/login/` and uses the real token.

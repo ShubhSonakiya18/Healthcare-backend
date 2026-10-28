@@ -47,8 +47,8 @@ REFRESH_URL = reverse("auth-token-refresh")
 def authenticate_bearer(access_token):
     """Authenticate a request carrying the token, exactly as protected views will.
 
-    There is no protected endpoint until Phase 4, so this calls SimpleJWT's
-    JWTAuthentication (our DEFAULT_AUTHENTICATION_CLASSES) directly.
+    It calls SimpleJWT's JWTAuthentication (our DEFAULT_AUTHENTICATION_CLASSES)
+    directly, so the token check is tested without going through a view.
     """
     request = APIRequestFactory().get("/", HTTP_AUTHORIZATION=f"Bearer {access_token}")
     return JWTAuthentication().authenticate(request)
@@ -177,7 +177,7 @@ class RegisterEndpointWithoutDatabaseTests(APISimpleTestCase):
         self.assertEqual(RegisterView.permission_classes, [AllowAny])
 
     def test_invalid_bearer_token_does_not_cause_a_401(self):
-        # Regression test for review finding M1: before the fix this was a
+        # Regression test: before the fix this was a
         # 401 token_not_valid from JWT authentication.
         self.client.credentials(HTTP_AUTHORIZATION="Bearer not-a-real-token")
         response = self.client.post(REGISTER_URL, {})
