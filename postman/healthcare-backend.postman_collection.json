@@ -1,0 +1,1407 @@
+{
+  "info": {
+    "name": "Healthcare Backend API",
+    "description": "Automated walk-through of the Healthcare Backend API (WhatBytes assignment).\n\nRun every folder in order. Each run registers two new users (A and B) with unique emails, captures their JWTs and the ids it creates, checks status codes and response bodies, and finally deletes the patient, doctor and mapping it created. The two users stay, because the API has no endpoint for deleting users.\n\nRun it with Newman (Node.js required). Either let npx download Newman:\n\n    npx --yes newman@6.2.3 run postman/healthcare-backend.postman_collection.json --env-var \"baseUrl=http://127.0.0.1:8000\" --reporters cli --bail\n\nor, if npx fails, install Newman into a temporary folder outside the project and run it from there:\n\n    npm install --prefix <temporary folder> newman@6.2.3\n    <temporary folder>/node_modules/.bin/newman run postman/healthcare-backend.postman_collection.json --env-var \"baseUrl=http://127.0.0.1:8000\" --reporters cli --bail\n\n`baseUrl` defaults to http://127.0.0.1:8000; override it as above or in Postman. The password variable is a fake value used only for these test accounts. Token and id variables start empty and are filled during the run.\n\nNote: in /api/mappings/<id>/ the number is a PATIENT id for GET and a MAPPING id for DELETE.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessA}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Stop with a clear message if this request needs a value that an earlier request should have saved.",
+          "// Requests without their own auth use the collection's Bearer {{accessA}}.",
+          "const requestText = JSON.stringify(pm.request.toJSON());",
+          "const needed = ['accessA', 'refreshA', 'accessB', 'patientId', 'doctorId', 'mappingId'].filter(function (name) {",
+          "    return requestText.indexOf('{{' + name + '}}') !== -1 || (name === 'accessA' && !pm.request.auth);",
+          "});",
+          "needed.forEach(function (name) {",
+          "    if (!pm.collectionVariables.get(name)) {",
+          "        throw new Error('Missing ' + name + ': an earlier request in this run failed or was skipped.');",
+          "    }",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Every response except 204 No Content carries a JSON body.",
+          "if (pm.response.code !== 204) {",
+          "    pm.test(\"Response body is JSON\", function () { pm.response.to.have.jsonBody(); });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "Clinic-Pass-2026",
+      "type": "string",
+      "description": "Fake password for the test accounts this collection creates."
+    },
+    {
+      "key": "runId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "emailA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "emailB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "doctorEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "patientId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "doctorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mappingId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "description": "Two fresh users per run (A and B); tokens are captured automatically.",
+      "item": [
+        {
+          "name": "Register user A (mixed-case email)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// A new run id per run: fresh accounts and doctor email, so the collection can be re-run.",
+                  "const runId = String(Date.now());",
+                  "pm.collectionVariables.set(\"runId\", runId);",
+                  "pm.collectionVariables.set(\"emailA\", \"newman.a.\" + runId + \"@example.com\");",
+                  "pm.collectionVariables.set(\"emailB\", \"newman.b.\" + runId + \"@example.com\");",
+                  "pm.collectionVariables.set(\"doctorEmail\", \"dr.newman.\" + runId + \"@example.com\");",
+                  "// Forget tokens and ids left over from an earlier run in the Postman app.",
+                  "[\"accessA\", \"refreshA\", \"accessB\", \"patientId\", \"doctorId\", \"mappingId\"].forEach(function (name) {",
+                  "    pm.collectionVariables.set(name, \"\");",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns only id, name and email\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"email\", \"id\", \"name\"]);",
+                  "});",
+                  "pm.test(\"Email is trimmed and stored lower-case\", function () {",
+                  "    pm.expect(body.email).to.equal(pm.collectionVariables.get(\"emailA\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Newman User A\",\n  \"email\": \"Newman.A.{{runId}}@Example.com\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Register user B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Newman User B\",\n  \"email\": \"{{emailB}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Register user A again in another letter case (rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Email already exists, in any letter case\", function () {",
+                  "    pm.expect(pm.response.json().email).to.eql([\"A user with this email already exists.\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Copy of A\",\n  \"email\": \"NEWMAN.A.{{runId}}@example.com\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Log in as user A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns an access and a refresh token\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"access\", \"refresh\"]);",
+                  "    pm.expect(String(body.access).split(\".\").length).to.equal(3);",
+                  "    pm.expect(String(body.refresh).split(\".\").length).to.equal(3);",
+                  "});",
+                  "pm.collectionVariables.set(\"accessA\", body.access || \"\");",
+                  "pm.collectionVariables.set(\"refreshA\", body.refresh || \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailA}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Log in as user B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns a JWT access token\", function () {",
+                  "    pm.expect(String(body.access).split(\".\").length).to.equal(3);",
+                  "});",
+                  "pm.collectionVariables.set(\"accessB\", body.access || \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailB}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Log in with a wrong password (rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 Unauthorized\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Detail is No active account found with the given credentials\", function () { pm.expect(pm.response.json().detail).to.equal(\"No active account found with the given credentials\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailA}}\",\n  \"password\": \"not-the-right-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Refresh user A's access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns only a new access token (no rotation)\", function () {",
+                  "    pm.expect(Object.keys(body)).to.eql([\"access\"]);",
+                  "    pm.expect(String(body.access).split(\".\").length).to.equal(3);",
+                  "});",
+                  "// Later requests use the refreshed token.",
+                  "pm.collectionVariables.set(\"accessA\", body.access || \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/token/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refreshA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Access control",
+      "description": "Requests without a valid token are refused.",
+      "item": [
+        {
+          "name": "List patients without a token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 Unauthorized\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Detail is Authentication credentials were not provided.\", function () { pm.expect(pm.response.json().detail).to.equal(\"Authentication credentials were not provided.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "List patients with an invalid token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 Unauthorized\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Code is token_not_valid\", function () { pm.expect(pm.response.json().code).to.equal(\"token_not_valid\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "not-a-real-token",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Refresh with an access token instead of a refresh token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 401 Unauthorized\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Token has the wrong type\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.code).to.equal(\"token_not_valid\");",
+                  "    pm.expect(body.detail).to.equal(\"Token has wrong type\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/token/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{accessA}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Patients",
+      "description": "Patients are private to their owner (user A here).",
+      "item": [
+        {
+          "name": "Create a patient (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns the documented fields, without an owner field\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"address\", \"created_at\", \"date_of_birth\", \"gender\", \"id\", \"name\", \"phone\", \"updated_at\"]);",
+                  "});",
+                  "pm.test(\"Saves the submitted values\", function () {",
+                  "    pm.expect(body.name).to.equal(\"Rahul Mehta\");",
+                  "    pm.expect(body.date_of_birth).to.equal(\"1990-04-12\");",
+                  "});",
+                  "pm.collectionVariables.set(\"patientId\", body.id ? String(body.id) : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/patients/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rahul Mehta\",\n  \"date_of_birth\": \"1990-04-12\",\n  \"gender\": \"male\",\n  \"phone\": \"+919876543210\",\n  \"address\": \"12 MG Road, Pune\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create a patient with a future date of birth (rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Date of birth error\", function () {",
+                  "    pm.expect(pm.response.json()).to.eql({ date_of_birth: [\"Date of birth cannot be in the future.\"] });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/patients/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Future Patient\",\n  \"date_of_birth\": \"2999-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List patients (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const ids = pm.response.json().map(function (p) { return p.id; });",
+                  "pm.test(\"Includes the new patient\", function () { pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"patientId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/"
+          }
+        },
+        {
+          "name": "Get the patient (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Is the same patient\", function () { pm.expect(pm.response.json().id).to.equal(Number(pm.collectionVariables.get(\"patientId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+          }
+        },
+        {
+          "name": "Update the patient with PUT (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Name is updated\", function () { pm.expect(body.name).to.equal(\"Rahul M. Mehta\"); });",
+                  "pm.test(\"Optional fields left out keep their values\", function () {",
+                  "    pm.expect(body.gender).to.equal(\"male\");",
+                  "    pm.expect(body.phone).to.equal(\"+919876543210\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rahul M. Mehta\",\n  \"date_of_birth\": \"1990-04-12\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PATCH the patient (not allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 405 Method Not Allowed\", function () { pm.response.to.have.status(405); });",
+                  "pm.test(\"Detail is Method 'PATCH' not allowed.\", function () { pm.expect(pm.response.json().detail).to.equal(\"Method \\\"PATCH\\\" not allowed.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Changed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get user A's patient as user B (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Detail is No Patient matches the given query.\", function () { pm.expect(pm.response.json().detail).to.equal(\"No Patient matches the given query.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List patients as user B (A's patient absent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const ids = pm.response.json().map(function (p) { return p.id; });",
+                  "pm.test(\"Does not include user A's patient\", function () { pm.expect(ids).to.not.include(Number(pm.collectionVariables.get(\"patientId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Doctors",
+      "description": "A shared directory: everyone reads, only the creator (user A) changes.",
+      "item": [
+        {
+          "name": "Create a doctor (user A, mixed-case email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns the documented fields, without an owner field\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"created_at\", \"email\", \"id\", \"name\", \"specialization\", \"updated_at\"]);",
+                  "});",
+                  "pm.test(\"Email is stored lower-case\", function () {",
+                  "    pm.expect(body.email).to.equal(pm.collectionVariables.get(\"doctorEmail\"));",
+                  "});",
+                  "pm.collectionVariables.set(\"doctorId\", body.id ? String(body.id) : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/doctors/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Neha Kapoor\",\n  \"specialization\": \"Cardiology\",\n  \"email\": \"Dr.Newman.{{runId}}@Example.COM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create the same doctor email in another case (user B, rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Doctor email already exists\", function () {",
+                  "    pm.expect(pm.response.json().email).to.eql([\"A doctor with this email already exists.\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/doctors/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Copy\",\n  \"specialization\": \"Cardiology\",\n  \"email\": \"DR.NEWMAN.{{runId}}@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List doctors as user B (shared directory)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const ids = pm.response.json().map(function (d) { return d.id; });",
+                  "pm.test(\"Includes user A's doctor\", function () { pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"doctorId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/doctors/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get the doctor as user B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Is the same doctor\", function () { pm.expect(pm.response.json().id).to.equal(Number(pm.collectionVariables.get(\"doctorId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update user A's doctor as user B (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 403 Forbidden\", function () { pm.response.to.have.status(403); });",
+                  "pm.test(\"Detail is You do not have permission to perform this action.\", function () { pm.expect(pm.response.json().detail).to.equal(\"You do not have permission to perform this action.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hijacked\",\n  \"specialization\": \"None\",\n  \"email\": \"{{doctorEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH the doctor (not allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 405 Method Not Allowed\", function () { pm.response.to.have.status(405); });",
+                  "pm.test(\"Detail is Method 'PATCH' not allowed.\", function () { pm.expect(pm.response.json().detail).to.equal(\"Method \\\"PATCH\\\" not allowed.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Changed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update the doctor with PUT (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Specialization is updated\", function () {",
+                  "    pm.expect(pm.response.json().specialization).to.equal(\"Interventional Cardiology\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dr. Neha Kapoor\",\n  \"specialization\": \"Interventional Cardiology\",\n  \"email\": \"{{doctorEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Patient-doctor mappings",
+      "description": "GET /api/mappings/<id>/ takes a PATIENT id; DELETE /api/mappings/<id>/ takes a MAPPING id.",
+      "item": [
+        {
+          "name": "Assign the doctor to the patient (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201 Created\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Returns the mapping object\", function () {",
+                  "    pm.expect(Object.keys(body).sort()).to.eql([\"created_at\", \"doctor\", \"doctor_detail\", \"id\", \"patient\", \"patient_name\"]);",
+                  "});",
+                  "pm.test(\"Links the right patient and doctor, with the doctor's details\", function () {",
+                  "    pm.expect(body.patient).to.equal(Number(pm.collectionVariables.get(\"patientId\")));",
+                  "    pm.expect(body.doctor).to.equal(Number(pm.collectionVariables.get(\"doctorId\")));",
+                  "    pm.expect(body.doctor_detail.id).to.equal(Number(pm.collectionVariables.get(\"doctorId\")));",
+                  "    pm.expect(body.doctor_detail.email).to.equal(pm.collectionVariables.get(\"doctorEmail\"));",
+                  "    pm.expect(body.patient_name).to.equal(\"Rahul M. Mehta\");",
+                  "});",
+                  "pm.collectionVariables.set(\"mappingId\", body.id ? String(body.id) : \"\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/mappings/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patientId}},\n  \"doctor\": {{doctorId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Assign the same pair again (rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Duplicate assignment error\", function () {",
+                  "    pm.expect(pm.response.json().non_field_errors).to.eql([\"This doctor is already assigned to this patient.\"]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/mappings/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patientId}},\n  \"doctor\": {{doctorId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Assign user A's patient as user B (rejected)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400 Bad Request\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Looks exactly like a patient that does not exist\", function () {",
+                  "    const expected = 'Invalid pk \"' + pm.collectionVariables.get(\"patientId\") + '\" - object does not exist.';",
+                  "    pm.expect(pm.response.json()).to.eql({ patient: [expected] });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/mappings/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient\": {{patientId}},\n  \"doctor\": {{doctorId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List mappings (user A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const ids = pm.response.json().map(function (m) { return m.id; });",
+                  "pm.test(\"Includes the new mapping\", function () { pm.expect(ids).to.include(Number(pm.collectionVariables.get(\"mappingId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/mappings/"
+          }
+        },
+        {
+          "name": "List mappings as user B (A's mapping absent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const ids = pm.response.json().map(function (m) { return m.id; });",
+                  "pm.test(\"Does not include user A's mapping\", function () { pm.expect(ids).to.not.include(Number(pm.collectionVariables.get(\"mappingId\"))); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/mappings/",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessB}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get the patient's doctors (id = PATIENT id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Lists exactly the one mapping, with the doctor's details\", function () {",
+                  "    pm.expect(body.length).to.equal(1);",
+                  "    pm.expect(body[0].id).to.equal(Number(pm.collectionVariables.get(\"mappingId\")));",
+                  "    pm.expect(body[0].doctor_detail.id).to.equal(Number(pm.collectionVariables.get(\"doctorId\")));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/mappings/{{patientId}}/",
+            "description": "The number in this URL is a patient id."
+          }
+        },
+        {
+          "name": "Delete the assigned doctor (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409 Conflict\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Detail is This doctor is assigned to one or more patients. Remove those assignments before deleting the doctor.\", function () { pm.expect(pm.response.json().detail).to.equal(\"This doctor is assigned to one or more patients. Remove those assignments before deleting the doctor.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+          }
+        },
+        {
+          "name": "Delete the mapping (id = MAPPING id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204 No Content\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/mappings/{{mappingId}}/",
+            "description": "The number in this URL is a mapping id."
+          }
+        },
+        {
+          "name": "Get the patient's doctors again (none left)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"No mappings remain\", function () { pm.expect(pm.response.json()).to.eql([]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/mappings/{{patientId}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Cleanup",
+      "description": "Removes everything this run created, except the two users (no API deletes users).",
+      "item": [
+        {
+          "name": "Delete the doctor (allowed now)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204 No Content\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+          }
+        },
+        {
+          "name": "Get the deleted doctor (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Detail is No Doctor matches the given query.\", function () { pm.expect(pm.response.json().detail).to.equal(\"No Doctor matches the given query.\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/doctors/{{doctorId}}/"
+          }
+        },
+        {
+          "name": "Delete the patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204 No Content\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+          }
+        },
+        {
+          "name": "Get the deleted patient (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404 Not Found\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Detail is No Patient matches the given query.\", function () { pm.expect(pm.response.json().detail).to.equal(\"No Patient matches the given query.\"); });",
+                  "// End of the run: don't leave tokens behind in the collection's variables.",
+                  "[\"accessA\", \"refreshA\", \"accessB\"].forEach(function (name) { pm.collectionVariables.set(name, \"\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/"
+          }
+        }
+      ]
+    }
+  ]
+}
