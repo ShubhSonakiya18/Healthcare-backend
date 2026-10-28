@@ -1,7 +1,7 @@
 # Architecture — Healthcare Backend
 
-**Status:** Approved 27 Oct 2026. Phase 2 (project configuration) is implemented. The rest describes Phases 3–9 and is updated as each phase lands.
-**Related:** [design.md](design.md) (data and API contracts) · [class.md](class.md) (class reference)
+**Status:** Approved 27 Oct 2026. The system described in §1–§12 is implemented (Phases 2–7, 28 Oct 2026); §13 lists what a production deployment would add, which is not built. Updated whenever the code changes.
+**Related:** [design.md](design.md) (data and API contracts) · [class.md](class.md) (class reference) · [api.md](api.md) (reference for API clients)
 
 **Assignment requirement or our design?** The assignment mandates the stack: Django, DRF, PostgreSQL, the Django ORM, SimpleJWT and environment variables for sensitive configuration. Everything else in this document is our design.
 
@@ -41,7 +41,7 @@ flowchart LR
 | Tokens | SimpleJWT 5.5.1 (PyJWT 2.15.1 underneath) | Issues access and refresh tokens at login; verifies the Bearer token on every protected request |
 | Validation and representation | DRF serializers | Check input; convert between JSON and model instances |
 | Data access | Django ORM + psycopg 3.3.6 | Builds SQL from Python (e.g. `Patient.objects.filter(...)`); generates and runs migrations |
-| Storage | PostgreSQL 14+ (verified on 16.15) | Stores the rows; enforces foreign keys and unique constraints |
+| Storage | PostgreSQL 14+ (verified on 16.15 and 18.6) | Stores the rows; enforces foreign keys and unique constraints |
 | Configuration | python-dotenv 1.2.4 + `os.environ` | Loads secrets and settings from `.env` into `settings.py` |
 
 The exact pins are in `requirements.txt`. DRF is 3.18.3 because every release before 3.18.2 has known security advisories, and 3.18.3 also reverts an accidental API change made in 3.18.2.
@@ -117,7 +117,7 @@ flowchart TD
 - **Models** define tables, relationships and database constraints. Migrations are generated from them.
 - **Permissions** hold reusable "may this user do this?" rules.
 
-## 4. Folder structure (target)
+## 4. Folder structure
 
 ```
 healthcare-backend/
@@ -131,6 +131,8 @@ healthcare-backend/
 ├── config/                 # the project package
 │   ├── settings.py
 │   ├── urls.py
+│   ├── views.py            # JSON error handlers (Phase 6)
+│   ├── tests.py            # project-wide tests (Phase 6)
 │   ├── asgi.py
 │   └── wsgi.py
 ├── accounts/               # users, register, login
@@ -147,7 +149,7 @@ healthcare-backend/
 ├── postman/
 │   └── healthcare-backend.postman_collection.json
 └── docs/
-    ├── architecture.md, design.md, class.md   # committed
+    ├── architecture.md, design.md, class.md, api.md   # committed
     ├── plan.md, memory.md        # committed during development
     └── learning.md, rules.md     # local only, git-ignored
 ```
@@ -160,26 +162,29 @@ Each app also has the `__init__.py`, `apps.py` and `admin.py` files that `starta
 |---|---|---|
 | `manage.py` | Command-line entry point: `runserver`, `migrate`, `test`, `createsuperuser` | 2 ✅ |
 | `config/settings.py` | All configuration, read from environment variables through three small helpers (`env_required`, `env_bool`, `env_list`) | 2 ✅ |
-| `config/urls.py` | Mounts `api/auth/`, `api/patients/`, `api/doctors/`, `api/mappings/` (and `admin/`) | 2–5 |
+| `config/urls.py` | Mounts `api/auth/`, `api/patients/`, `api/doctors/`, `api/mappings/` (and `admin/`); sets `handler400`, `handler404`, `handler500` | 2–6 ✅ |
+| `config/views.py` | JSON error handlers `bad_request`, `not_found`, `server_error` (used when `DEBUG` is off) | 6 ✅ |
+| `config/tests.py` | Project-wide tests: error responses, token lifecycle, logging, response exposure, settings helpers | 6 ✅ |
 | `config/wsgi.py`, `config/asgi.py` | Server entry points (unchanged defaults) | 2 ✅ |
-| `accounts/models.py` | `User`: email login, a `name` field, no username | 3 |
-| `accounts/managers.py` | `UserManager`: creates users and superusers, normalises the email, hashes the password | 3 |
-| `accounts/serializers.py` | `RegisterSerializer`, `EmailTokenObtainPairSerializer` | 3 |
-| `accounts/views.py` | `RegisterView`, `LoginView` | 3 |
-| `patients/models.py` | `Patient`, with the `created_by` owner foreign key | 4 |
-| `patients/serializers.py` | `PatientSerializer`: field validation (date of birth, phone, gender) | 4 |
-| `patients/permissions.py` | `IsPatientOwner`: object-level backstop | 4 |
-| `patients/views.py` | List/create and detail views, with querysets scoped to the caller | 4 |
-| `doctors/models.py` | `Doctor`, with a nullable `created_by` | 4 |
-| `doctors/serializers.py` | `DoctorSerializer`: case-insensitive unique email | 4 |
-| `doctors/permissions.py` | `IsCreatorOrReadOnly` | 4 |
-| `doctors/views.py` | List/create and detail views; `DoctorInUse` (409) | 4–5 |
-| `mappings/models.py` | `PatientDoctorMapping`, unique per (patient, doctor) | 5 |
-| `mappings/serializers.py` | `PatientDoctorMappingSerializer`: `patient` field limited to the caller's patients | 5 |
-| `mappings/views.py` | `MappingListCreateView`, `MappingDetailView` | 5 |
-| `*/tests.py` | API tests for that app | 3–7 |
-| `*/migrations/` | Generated schema changes, committed to Git | 3–5 |
-| `postman/healthcare-backend.postman_collection.json` | Postman collection for manual and automated (newman) runs | 7 |
+| `accounts/models.py` | `User`: email login, a `name` field, no username | 3 ✅ |
+| `accounts/managers.py` | `UserManager`: creates users and superusers, normalises the email, hashes the password | 3 ✅ |
+| `accounts/serializers.py` | `RegisterSerializer`, `EmailTokenObtainPairSerializer` | 3 ✅ |
+| `accounts/views.py` | `RegisterView`, `LoginView` | 3 ✅ |
+| `patients/models.py` | `Patient`, with the `created_by` owner foreign key | 4 ✅ |
+| `patients/serializers.py` | `PatientSerializer`: field validation (date of birth, phone, gender) | 4 ✅ |
+| `patients/permissions.py` | `IsPatientOwner`: object-level backstop | 4 ✅ |
+| `patients/views.py` | List/create and detail views, with querysets scoped to the caller | 4 ✅ |
+| `doctors/models.py` | `Doctor`, with a nullable `created_by` | 4 ✅ |
+| `doctors/serializers.py` | `DoctorSerializer`: case-insensitive unique email | 4 ✅ |
+| `doctors/permissions.py` | `IsCreatorOrReadOnly` | 4 ✅ |
+| `doctors/views.py` | List/create and detail views; `DoctorInUse` (409) | 4–5 ✅ |
+| `mappings/models.py` | `PatientDoctorMapping`, unique per (patient, doctor) | 5 ✅ |
+| `mappings/serializers.py` | `PatientDoctorMappingSerializer`: `patient` field limited to the caller's patients | 5 ✅ |
+| `mappings/views.py` | `MappingListCreateView`, `MappingDetailView` | 5 ✅ |
+| `*/tests.py` | API tests for that app | 3–6 ✅ |
+| `*/migrations/` | Generated schema changes, committed to Git | 3–5 ✅ |
+| `postman/healthcare-backend.postman_collection.json` | Postman collection for manual and automated (newman) runs | 7 ✅ |
+| `README.md`, `docs/api.md` | Setup and usage; the API reference for clients | 8 ✅ |
 
 ## 6. Database interaction and transaction boundaries
 
@@ -352,7 +357,10 @@ flowchart LR
 
 **Why the user model has to come first:** every foreign key to "the user" (`Patient.created_by`, `Doctor.created_by`, Django admin's log table) points at whatever `AUTH_USER_MODEL` was when it was first migrated. Switching from Django's built-in `auth.User` to `accounts.User` after those tables exist means rewriting the relations by hand, or resetting the database. Setting it before the first `migrate` costs nothing. That is why Phase 2 stops before `migrate`.
 
-**Workspace note (verification environment only):** Claude's workspace runs a private PostgreSQL 16.15 cluster. Its data is in `/home/claude/pgdata`, and it runs as the unprivileged OS user `claude`, because PostgreSQL refuses to run as root. The cluster's superuser connects over a Unix socket with `peer` authentication. `healthcare_user` connects over TCP to `localhost` with a `scram-sha-256` password, exactly as on a normal installation. Background processes are stopped shortly after each reply, so the server is stopped cleanly at the end of each phase and started again at the beginning of the next; its data stays on disk.
+**Verification environments:**
+
+- **Phase 2:** verified in Claude's cloud workspace, on a private PostgreSQL 16.15 cluster that ran as an unprivileged OS user. Its superuser connected over a Unix socket with `peer` authentication; `healthcare_user` connected over TCP with a `scram-sha-256` password.
+- **Since 28 Oct (Phase 3 onward):** everything runs on Shubh's Windows machine, with PostgreSQL 18.6 installed as a local service on port 5432 and `healthcare_user` connecting over TCP to `localhost` with a password. The cloud workspace is no longer used.
 
 ## 13. What a production deployment would add (out of scope)
 

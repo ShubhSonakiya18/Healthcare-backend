@@ -1,7 +1,7 @@
 # Data and API Design
 
-**Status:** Approved 27 Oct 2026. Nothing here is implemented yet; the models arrive in Phases 3–5. Update this file whenever the code changes, so it always describes the real system.
-**Related:** [architecture.md](architecture.md) (how it fits together) · [class.md](class.md) (classes)
+**Status:** Approved 27 Oct 2026. Implemented in Phases 3–6 (28 Oct 2026). Update this file whenever the code changes, so it always describes the real system.
+**Related:** [architecture.md](architecture.md) (how it fits together) · [class.md](class.md) (classes) · [api.md](api.md) (reference for API clients)
 
 **Assignment requirement or our design?** The assignment fixes the stack and, for each endpoint, only the method, the path and a one-line purpose. Everything else in this document is our design, approved on 27 Oct 2026: fields, constraints, deletion rules, request and response bodies, status codes and error messages. Tags and "Source" columns show which is which: **[Spec]** comes from the assignment; **[Proposed]** is our decision.
 
@@ -75,6 +75,8 @@ In plain words:
 | `date_joined`, `last_login` | DateTimeField | auto | | inherited from `AbstractUser` |
 
 Removed from `AbstractUser`: `username`, `first_name`, `last_name`.
+
+Default ordering: `id` ascending (`class Meta(AbstractUser.Meta)` with `ordering = ["id"]`, which keeps `AbstractUser`'s verbose names).
 
 Source: the assignment names `name`, `email` and `password` for registration [Spec]. The model itself, email login and case-insensitive uniqueness are our design [Proposed].
 
@@ -174,6 +176,8 @@ There is no API endpoint for deleting users; that can only happen through Django
 ## 7. API contracts
 
 **What the assignment fixes, and what we designed.** For each endpoint the assignment gives only the method, the path and a one-line purpose; the headings below mark those **[Spec]**. Request bodies, response bodies, field names, status codes and error messages are **our design** (approved 27 Oct 2026). The approved contract is frozen: changing any part of it needs a new, documented design decision and Shubh's explicit approval.
+
+This section is the design record. For API clients, [api.md](api.md) presents the same contract endpoint by endpoint, with every field rule and error message.
 
 Common rules for every endpoint:
 
